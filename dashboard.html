@@ -3058,8 +3058,8 @@ document.addEventListener('DOMContentLoaded', () => {
      - If no backend exists yet, the site keeps working with local/manual stats.
   ====================================================================== */
   const MB_API_ENDPOINTS = {
-   socialInsights: 'https://musixblvd-backend.onrender.com/api/social-insights',
-mikeyAdvice: 'https://musixblvd-backend.onrender.com/api/mikey-advice'
+   socialInsights: 'https://musixblvd.backend.onrender.com/api/social-insights',
+mikeyAdvice: 'https://musixblvd.backend.onrender.com/api/mikey-advice'
   };
 
   function normalizeHandleOrUrl(value) {
@@ -7632,7 +7632,7 @@ document.addEventListener('DOMContentLoaded', () => {
 (() => {
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
-  const MB_MIKE_CHAT_ENDPOINT = 'https://musixblvd-backend.onrender.com/api/mikey-chat';
+  const MB_MIKE_CHAT_ENDPOINT = 'https://musixblvd.backend.onrender.com/api/mikey-chat';
 
   function escapeHtml(value){
     return String(value || '')
