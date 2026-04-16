@@ -97,8 +97,8 @@ app.post('/api/mikey-chat', async (req, res) => {
   }
 });
 
-app.get('*', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'dashboard.html'));
+app.get('/', (_req, res) => {
+  res.json({ ok: true, service: 'MusixBlvd backend live' });
 });
 
 app.listen(port, () => {
