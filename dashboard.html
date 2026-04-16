@@ -3057,8 +3057,10 @@ document.addEventListener('DOMContentLoaded', () => {
      - These use backend endpoints so secrets stay off the page.
      - If no backend exists yet, the site keeps working with local/manual stats.
   ====================================================================== */
-socialInsights: 'https://musixblvd.onrender.com/api/social-insights',
-mikeyAdvice: 'https://musixblvd.onrender.com/api/mikey-advice'
+const MB_API_ENDPOINTS = {
+  socialInsights: 'https://musixblvd.onrender.com/api/social-insights',
+  mikeyAdvice: 'https://musixblvd.onrender.com/api/mikey-advice'
+};
 
   function normalizeHandleOrUrl(value) {
     return String(value || '').trim();
@@ -7630,7 +7632,8 @@ document.addEventListener('DOMContentLoaded', () => {
 (() => {
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
- const MB_MIKE_CHAT_ENDPOINT = 'https://musixblvd.onrender.com/api/mikey-chat';
+const MB_MIKE_CHAT_ENDPOINT = 'https://musixblvd.onrender.com/api/mikey-chat';
+ 
   function escapeHtml(value){
     return String(value || '')
       .replace(/&/g, '&amp;')
