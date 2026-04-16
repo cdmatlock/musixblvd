@@ -1,6 +1,7 @@
 import express from 'express';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
+import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -15,8 +16,18 @@ const openai = new OpenAI({
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+app.use(cors({
+  origin: (origin, callback) => callback(null, true),
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+app.options('*', cors());
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(__dirname));
+
+app.get('/health', (_req, res) => {
+  res.json({ ok: true, service: 'mikey-server' });
+});
 
 function buildSystemPrompt() {
   return [
@@ -97,8 +108,8 @@ app.post('/api/mikey-chat', async (req, res) => {
   }
 });
 
-app.get('/', (_req, res) => {
-  res.json({ ok: true, service: 'MusixBlvd backend live' });
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'dashboard.html'));
 });
 
 app.listen(port, () => {
