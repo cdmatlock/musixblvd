@@ -7632,7 +7632,9 @@ document.addEventListener('DOMContentLoaded', () => {
 (() => {
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
-const MB_MIKE_CHAT_ENDPOINT = 'https://musixblvd.onrender.com/api/mikey-chat';
+const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('onrender.com'))
+  ? '/api/mikey-chat'
+  : 'https://musixblvd.onrender.com/api/mikey-chat';
  
   function escapeHtml(value){
     return String(value || '')
@@ -7804,7 +7806,9 @@ const MB_MIKE_CHAT_ENDPOINT = 'https://musixblvd.onrender.com/api/mikey-chat';
 </style>
 <script>
 (function(){
-  const ENDPOINT = 'https://musixblvd.onrender.com/api/mikey-chat';
+  const ENDPOINT = (location.hostname && location.hostname.includes('onrender.com'))
+    ? '/api/mikey-chat'
+    : 'https://musixblvd.onrender.com/api/mikey-chat';
 
   function $(sel){ return document.querySelector(sel); }
   function $all(sel){ return Array.from(document.querySelectorAll(sel)); }
