@@ -68,7 +68,7 @@ app.post('/api/mikey-chat', async (req, res) => {
 ];
 
     const response = await openai.responses.create({
-      model: 'gpt-5.4',
+      model: 'gpt-4o-mini',
       input,
       temperature: 0.8,
       max_output_tokens: 500
