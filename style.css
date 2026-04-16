@@ -1,0 +1,221 @@
+/* === Global login/landing styles (mobile-first, white theme) === */
+:root {
+  --mb-blue: #1aa3ff;
+  --mb-blue-2: #0e7fd4;
+  --ink: #0b0b0d;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --ring: #1aa3ff55;
+}
+
+/* Reset & base */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; width: 100%; }
+html { overflow-x: hidden; }
+body {
+  font-family: "Poppins", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  color: #111;
+  background: #ffffff;
+  min-height: 100dvh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding:
+    max(16px, env(safe-area-inset-top))
+    max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+  overflow-x: hidden;
+}
+
+/* wrapper */
+.wrap {
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Login card -- made narrower */
+.card {
+  width: min(460px, 100%);            /* was 560px */
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 18px 14px;                  /* a little tighter */
+  box-shadow: 0 8px 26px rgba(0,0,0,0.06);
+}
+
+.brand {
+  display: block;
+  width: 100%;
+  max-width: 260px;  /* was 300 / 280 */
+  height: auto;
+  object-fit: contain;
+  margin: 160px auto 14px auto;
+}
+
+
+/* Title smaller to make room for logo */
+.title {
+  text-align: center;
+  margin-bottom: 16px;
+  font-weight: 600;
+  font-size: 1.25rem;                  /* was 1.5rem */
+  color: #0f172a;
+}
+
+/* Form — slimmer */
+.form {
+  width: min(380px, 100%);             /* was 460px */
+  margin: 0 auto;
+  display: grid;
+  gap: 14px;
+}
+input, button { font-size: 15px; }     /* a bit smaller */
+
+.field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;                 /* was 14px */
+  padding: 10px 12px;                  /* was 12px 14px */
+}
+.field:focus-within {
+  border-color: var(--mb-blue);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+.field .icon { font-size: 16px; opacity: 0.7; }
+.field input {
+  flex: 1;
+  border: 0;
+  outline: 0;
+  font-size: 15px;
+  background: transparent;
+  color: #111;
+}
+.toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+/* Row */
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: #374151;
+}
+.link {
+  color: var(--mb-blue);
+  text-decoration: none;
+  font-weight: 600;
+}
+.link[aria-disabled="true"] {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Buttons — tighter */
+.btn {
+  border: none;
+  cursor: pointer;
+  border-radius: 10px;
+  padding: 10px 14px;                  /* was 12px 16px */
+  font-weight: 600;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.primary {
+  background: linear-gradient(180deg, var(--mb-blue), var(--mb-blue-2));
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(26,163,255,.35);
+}
+.primary:hover { transform: translateY(-2px); }
+.primary:active { transform: none; }
+
+/* Social buttons — smaller */
+.social-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 6px;
+}
+.btn.social {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #fff;
+  border: 1px solid var(--border);
+  color: #111;
+  padding: 9px 12px;
+}
+.btn.social:hover { border-color: #cbd5e1; }
+.svg { font-weight: bold; font-size: 13px; }
+
+/* Small text */
+.tiny {
+  text-align: center;
+  font-size: 11px;
+  margin-top: 6px;
+  color: #6b7280;
+}
+.muted { color: #6b7280; }
+
+/* Responsive */
+@media (max-width: 520px) {
+  .card {
+    width: 100%;
+    padding: 14px 10px;
+    border-radius: 14px;
+  }
+  .brand {
+    max-width: 280px;                  /* still big */
+  }
+  .form {
+    width: 100%;
+  }
+  .social-grid {
+    grid-template-columns: 1fr;
+  }
+
+
+
+
+
+
+
+  @media (max-width: 520px) {
+  body {
+    align-items: flex-start;         /* don’t vertically center */
+    padding-top: 48px;               /* add more top space */
+  }
+
+  .card {
+    margin-top: 0;                   /* keep it controlled by body padding */
+  }
+
+  .brand {
+    margin-top: 40px;                /* still some space inside the card */
+  }
+}
+
+}

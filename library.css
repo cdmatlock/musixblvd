@@ -1,0 +1,63 @@
+/* ===== MusixBlvd – Library (standalone) ===== */
+:root{
+  --mb-blue:#1aa3ff;
+  --mb-blue-2:#0e7fd4;
+  --muted:#64748b;
+  --border:#e5e7eb;
+}
+
+#library .lib-wrap{
+  max-width:1200px;
+  margin:0 auto;
+}
+
+#library .lib-head{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;
+}
+
+#library .lib-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;
+}
+@media (max-width:900px){ #library .lib-grid{ grid-template-columns:1fr; } }
+
+#library .lib-card{
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:16px;
+  background:#fff;
+  box-shadow:0 8px 22px rgba(0,0,0,.05);
+}
+
+#library .muted{ color:var(--muted); }
+
+#library .lib-providers{ display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+#library .prov{
+  appearance:none;border:1px solid var(--border);background:#fff;color:#0f172a;
+  padding:8px 12px;border-radius:999px;font-weight:700;cursor:pointer;
+}
+#library .prov.active{ border-color:#93c5fd; box-shadow:0 0 0 3px #93c5fd44; }
+
+#library .check{ display:inline-flex;align-items:center;gap:8px; }
+
+#library .btn{
+  border:0;cursor:pointer;border-radius:10px;padding:10px 14px;font-weight:700;
+}
+#library .btn.primary{
+  background:linear-gradient(180deg,var(--mb-blue),var(--mb-blue-2));
+  color:#fff; box-shadow:0 6px 14px rgba(26,163,255,.25);
+}
+#library .btn.outline{ background:#fff; border:1px solid var(--border); }
+#library .btn.outline:hover{ border-color:#cbd5e1; }
+
+#library .uploader{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px; }
+
+#library .stats{
+  display:grid; grid-template-columns:repeat(2,1fr); gap:10px;
+}
+@media (max-width:640px){ #library .stats{ grid-template-columns:1fr; } }
+#library .stat{
+  display:flex; align-items:center; justify-content:space-between;
+  border:1px solid var(--border); border-radius:12px; padding:10px 12px; background:#fff;
+}
+#library .bullets{ margin:8px 0 0; padding-left:18px; }
+#library .bullets li{ margin:6px 0; }

@@ -1,0 +1,4270 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>MusixBlvd • Dashboard</title>
+<!-- keep your original CSS files if you have them -->
+<link href="opps-advanced.css" rel="stylesheet"/>
+<link href="library.css" rel="stylesheet"/>
+<style>
+    :root{
+      --mb-blue:#1aa3ff;
+      --mb-blue-2:#0e7fd4;
+      --border:#e5e7eb;
+      --ink:#0b0b0d;
+    }
+    *{ box-sizing:border-box; }
+    html, body { height:100%; max-width:100%; overflow-x:hidden; }
+    body{
+      margin:0;
+      font-family:Poppins,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      color:#0f172a;
+      background:#fff;
+    }
+
+    .hidden{display:none !important;}
+    .panel{display:none;}
+    .panel.active{display:block;}
+
+    /* ---------- Topbar (DESKTOP: tabs centered) ---------- */
+    .topbar{
+      position:sticky; top:0; z-index:50;
+      display:grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items:center;
+      padding:10px 16px;
+      border-bottom:1px solid var(--border);
+      background:rgba(255,255,255,.75);
+      backdrop-filter:blur(8px);
+      gap:12px;
+    }
+    .brand{
+      display:flex; align-items:center; gap:10px;
+      font-weight:800; justify-self:start; min-width:0;
+    }
+    .brand .logo{height:32px; object-fit:contain}
+
+    .tabs{
+      justify-self:center;
+      display:flex; gap:8px; flex-wrap:wrap; min-width:0;
+    }
+    .tab{
+      appearance:none; border:1px solid transparent; background:#fff; color:#0f172a;
+      padding:8px 12px; border-radius:999px; font-weight:700; cursor:pointer; min-width:0;
+    }
+    .tab:hover{border-color:var(--border)}
+    .tab.active{
+      background:linear-gradient(180deg,var(--mb-blue),var(--mb-blue-2));
+      color:#fff; box-shadow:0 6px 16px rgba(26,163,255,.35)
+    }
+
+    .user{justify-self:end; min-width:0;}
+    .user .btn{margin-left:8px}
+    .btn{border:0; cursor:pointer; border-radius:10px; padding:10px 14px; font-weight:700}
+    .btn.outline{background:#fff; border:1px solid var(--border)}
+    .btn.primary{background:linear-gradient(180deg,var(--mb-blue),var(--mb-blue-2)); color:#fff; box-shadow:0 8px 20px rgba(26,163,255,.35)}
+    .btn.small{padding:8px 10px; font-size:14px}
+    .btn.tiny{padding:6px 8px; font-size:12px}
+
+    /* ---------- Page + cards ---------- */
+    .page{padding:18px; max-width:980px; margin:0 auto}
+    .panel-card{
+      background:rgba(255,255,255,.78);
+      border:1px solid rgba(255,255,255,.55);
+      border-radius:16px; padding:18px;
+      box-shadow:0 8px 26px rgba(0,0,0,.08);
+      max-width:920px; margin:12px auto;
+      backdrop-filter: blur(8px);
+      position:relative; z-index:1;
+    }
+
+    /* ---------- AI hero ---------- */
+    .ai-hero{text-align:center; padding:24px}
+    .ai-robot{display:flex; align-items:center; justify-content:center; gap:40px; flex-wrap:wrap; text-align:left}
+    .ai-hero-copy{flex:1 1 320px; position:relative; z-index:2; min-width:280px}
+    .providers{display:flex; flex-wrap:wrap; gap:8px; margin:10px 0}
+    .prov{appearance:none; border:1px solid var(--border); background:#fff; padding:8px 12px; border-radius:999px; font-weight:700; cursor:pointer}
+    .prov.active{border-color:#93c5fd; box-shadow:0 0 0 3px #93c5fd44}
+    .check{display:inline-flex; align-items:center; gap:8px}
+
+    /* ---------- Mascot image ---------- */
+    .mic-mascot{
+      width:190px; height:auto; flex:0 0 auto; border-radius:50%;
+      animation:micFloat 3s ease-in-out infinite; transition:transform .2s ease,filter .2s ease;
+      filter:drop-shadow(0 4px 12px rgba(0,0,0,.35)); pointer-events:none
+    }
+    @keyframes micFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+    @keyframes micTalk{0%,100%{transform:scale(1);filter:drop-shadow(0 0 0 rgba(26,163,255,0))}50%{transform:scale(1.08);filter:drop-shadow(0 0 18px rgba(26,163,255,.6))}}
+    .mic-mascot.is-talking{animation:micFloat 3s ease-in-out infinite, micTalk .4s infinite alternate}
+
+    /* ---------- Chat ---------- */
+    .chat-wrap{display:grid; grid-template-columns:240px 1fr; gap:16px}
+    .chat-side{background:rgba(255,255,255,.72); backdrop-filter:blur(6px); border:1px solid var(--border); border-radius:16px; padding:16px}
+    .chat-log{background:rgba(255,255,255,.72); backdrop-filter:blur(6px); border:1px solid var(--border); border-radius:16px; padding:14px; height:50vh; overflow:auto}
+    .msg{display:flex; gap:10px; margin-bottom:12px}
+    .msg .bubble{padding:10px 12px; border-radius:14px; border:1px solid var(--border); background:#fff; max-width:80%}
+    .msg.ai .bubble{background:linear-gradient(180deg,#fff,#f8fbff); border-color:#dbeafe}
+    .msg.me{justify-content:flex-end}
+    .msg.me .bubble{background:linear-gradient(180deg,var(--mb-blue),var(--mb-blue-2)); color:#fff; border-color:transparent}
+    .chat-input{display:flex; gap:8px; margin-top:8px}
+    .chat-input input{flex:1; padding:12px 14px; border-radius:12px; border:1px solid var(--border); background:rgba(255,255,255,.9)}
+
+    /* ---------- SEARCH DIRECTORY ---------- */
+    #opps .dir-tags{display:flex; gap:6px; flex-wrap:wrap}
+    #opps .dir-filter{white-space:nowrap}
+    #opps .dir-filter.active{
+      background:linear-gradient(180deg,var(--mb-blue),var(--mb-blue-2));
+      color:#fff; border-color:transparent; box-shadow:0 6px 16px rgba(26,163,255,.28)
+    }
+    #opps .search{position:relative; display:flex; align-items:center; min-width:0}
+    #opps .search input{border:1px solid var(--border); border-radius:12px; padding:10px 36px 10px 12px; background:#fff; width:100%}
+    #opps .search .kbd{
+      position:absolute; right:10px; font-size:12px; color:#94a3b8;
+      border:1px solid #e2e8f0; border-radius:6px; padding:1px 6px; background:#f8fafc
+    }
+
+    /* directory grid/cards */
+    .dir-grid,
+    #dirGrid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));
+      gap:12px;
+      margin-top:10px;
+    }
+    .dir-card{
+      background:rgba(255,255,255,.88);
+      border:1px solid rgba(255,255,255,.55);
+      border-radius:14px;
+      padding:12px;
+      display:flex;
+      gap:10px;
+      align-items:flex-start;
+    }
+    .dir-card .avatar{
+      width:42px; height:42px;
+      border-radius:50%;
+      display:grid; place-items:center;
+      background:#e2e8f0;
+      font-weight:700;
+    }
+    .dir-card .dir-main{flex:1 1 auto; min-width:0}
+    .dir-name{font-weight:700}
+    .dir-meta{font-size:12px; color:#64748b; margin-top:2px}
+    .dir-tags-row{display:flex; gap:6px; flex-wrap:wrap; margin:6px 0}
+    .tag{
+      font-size:12px; padding:3px 8px; border-radius:999px;
+      background:#f8fafc; border:1px solid #e2e8f0;
+    }
+    .dir-actions{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px}
+    .online-badge{
+      display:inline-flex; align-items:center; gap:4px;
+      font-size:11px; color:#0f766e; background:#ecfdf3; border:1px solid #bbf7d0;
+      border-radius:999px; padding:2px 8px;
+    }
+    .offline-badge{
+      display:inline-flex; align-items:center; gap:4px;
+      font-size:11px; color:#94a3b8; background:#f8fafc; border:1px solid #e2e8f0;
+      border-radius:999px; padding:2px 8px;
+    }
+
+    /* modals */
+    .modal{position:fixed; inset:0; display:grid; place-items:center; background:rgba(0,0,0,.35); z-index:60}
+    .modal.hidden{display:none !important;}
+    .modal-card{width:min(560px,92vw); background:#fff; border-radius:16px; border:1px solid var(--border); padding:16px; box-shadow:0 20px 60px rgba(0,0,0,.25)}
+    .modal .actions{display:flex; justify-content:flex-end; gap:8px; margin-top:10px}
+    .modal .row{display:grid; grid-template-columns:120px 1fr auto; gap:8px; align-items:center; margin:8px 0}
+    .modal .label{font-size:12px; color:#64748b}
+
+    /* ---------- Profile tiny tag ---------- */
+    #profileBadges .tag{font-size:12px; padding:3px 8px; border-radius:999px; background:#f1f5f9; color:#334155; border:1px solid #e2e8f0}
+
+    /* ---------- Inputs + lists ---------- */
+    .input{padding:10px 12px; border:1px solid var(--border); border-radius:10px; width:100%; background:#fff; min-width:0}
+    .bullets{padding-left:18px}
+
+    .avatar{width:36px; height:36px; border-radius:50%; display:grid; place-items:center; font-weight:800; background:#e2e8f0; color:#0f172a}
+
+    /* ---------- Background overlay when photo is on ---------- */
+    body.has-photo-bg::before{
+      content:""; position:fixed; inset:0; pointer-events:none;
+      background:rgba(0,0,0,.20); z-index:0;
+    }
+
+    /* ---------- Word wrapping guards ---------- */
+    .panel-card, .prof-card, .tag, .tabs, .btn, .input{
+      overflow-wrap:anywhere; word-break:break-word;
+    }
+
+    /* ---------- Media safety ---------- */
+    img, video { max-width:100%; height:auto; display:block; }
+
+    /* ====================== Responsive ====================== */
+    @media (max-width:900px){
+      .topbar{display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;}
+      .brand{order:1}
+      .tabs{
+        order:2; width:100%;
+        display:flex; justify-content:center; gap:8px;
+        flex-wrap:wrap; overflow:visible;
+      }
+      .user{order:3; margin-left:auto}
+
+      .chat-wrap{grid-template-columns:1fr}
+      .page{padding:14px}
+    }
+
+    @media (max-width:740px){
+      .panel-card, .prof-card{padding-left:12px; padding-right:12px}
+      .prof-wrap{grid-template-columns:1fr !important; gap:12px}
+      .modal .row{grid-template-columns:1fr !important; align-items:stretch !important;}
+      .modal .actions{flex-wrap:wrap}
+      #dirGrid{grid-template-columns:1fr;}
+    }
+
+    /* ===== LIBRARY — mobile visibility fix ===== */
+    @media (max-width: 740px){
+      #library .lib-grid{
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+        margin-top: 12px !important;
+      }
+      #library .lib-grid > .panel-card{
+        margin: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box;
+      }
+      #library .uploader,
+      #library .uploader input[type="file"]{
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+      #library audio{
+        width: 100% !important;
+        max-width: 100% !important;
+        display: block;
+      }
+      #library #analysisStats{
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+    }
+
+    /* extra safety */
+    html, body { max-width: 100%; overflow-x: hidden; }
+    #ai .providers{ position:relative; z-index:3; }
+    #ai .prov{ pointer-events:auto; }
+    .mic-mascot{ pointer-events:none; }
+
+    /* user-tunable colors */
+    :root{
+      --mb-blue: #1aa3ff;
+      --mb-blue-2: #0e7fd4;
+      --border: #e5e7eb;
+      --ink: #0b0b0d;
+      --page-bg: #ffffff;
+      --panel-bg: rgba(248, 250, 252, 0.9);
+    }
+    .panel-card{
+      background: var(--panel-bg);
+      border:1px solid rgba(255,255,255,.55);
+      border-radius:16px;
+      padding:18px;
+      box-shadow:0 8px 26px rgba(0,0,0,.08);
+    }
+    body{ background: var(--page-bg); }
+    :root { --panel-bg: rgba(255,255,255,.78); }
+    .panel-card{
+      background: var(--panel-bg);
+      border:1px solid rgba(255,255,255,.55);
+      border-radius:16px;
+      padding:18px;
+      box-shadow:0 8px 26px rgba(0,0,0,.08);
+      max-width:920px;
+      margin:12px auto;
+      backdrop-filter: blur(8px);
+      position:relative;
+      z-index:1;
+    }
+/* OPTIONAL: polish for the LIVE pills area in the View modal */
+#dirLiveBlock{ margin-top:10px; }
+#dirLiveBlock .live-pills{
+  display:flex; gap:6px; flex-wrap:wrap; align-items:center;
+}
+#dirLiveBlock .pill-live{
+  /* reuses your .tag look, just ensures inline-flex centering */
+  display:inline-flex; align-items:center; gap:6px;
+}
+#dirLiveBlock [hidden]{ display:none !important; }
+#dirNowPlaying{ margin-top:6px; }
+
+
+
+.live-pills .live-link {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:4px 10px; border:1px solid var(--border);
+  border-radius:999px; text-decoration:none;
+  background:#ecfdf3; color:#166534; font-weight:600;
+}
+.live-pills .live-link:hover { filter:brightness(0.95); }
+.live-pills .live-link.disabled { opacity:.7; cursor:default; }
+.live-pills svg { width:16px; height:16px; display:block; }
+.live-pills .live-label { line-height:1; }
+
+
+  .live-chip{
+    display:inline-flex; align-items:center; gap:8px;
+    border:1px solid var(--border, #e2e8f0); border-radius:999px;
+    padding:6px 10px; text-decoration:none;
+    background:#fff; line-height:1;
+  }
+  .live-chip[aria-disabled="true"]{ pointer-events:none; opacity:.7; }
+  .live-logo{
+    width:18px; height:18px; display:block; object-fit:contain;
+  }
+  .live-name{ font-size:12px; color:#0f172a; }
+  /* keep the green “live” dot vibe */
+  .live-dot{ width:8px; height:8px; border-radius:50%; background:#16a34a; box-shadow:0 0 0 2px #dcfce7; }
+  /* container (your existing .tag) just becomes a holder */
+  .live-pill.tag{ border:none; padding:0; background:transparent; }
+
+  /* ====== tiny reset for live logo chips ====== */
+  .live-chip{
+    display:inline-flex; align-items:center; gap:8px;
+    border:1px solid var(--border, #e2e8f0); border-radius:999px;
+    padding:6px 10px; text-decoration:none; background:#fff;
+    line-height:1;
+  }
+  .live-chip[aria-disabled="true"]{ pointer-events:none; opacity:.7; }
+  .live-logo{ width:18px; height:18px; object-fit:contain; display:block; }
+  .live-name{ font-size:12px; color:#0f172a; }
+  .live-dot{ width:8px; height:8px; border-radius:50%; background:#16a34a; box-shadow:0 0 0 2px #dcfce7; }
+  .live-pill.tag{ border:none; padding:0; background:transparent; }
+
+/* Avatar upload button */
+#profile .btn.outline.tiny {
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#profile .btn.outline.tiny:hover {
+  background: rgba(0,0,0,0.05);
+}
+
+/* Make sure avatar image always stays clean */
+#profPreview {
+  background-color: #f8fafc;
+}
+
+/* Terms overlay */
+.terms-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+/* When hidden, fully remove it */
+.terms-overlay.hidden {
+  display: none;
+}
+
+/* Terms card box */
+.terms-card {
+  width: min(600px, 92vw);
+  max-height: 80vh;
+  background: #020617;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.85);
+  padding: 20px 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: #e5e7eb;
+}
+
+.terms-card h2 {
+  font-size: 1.1rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.terms-summary {
+  font-size: 0.85rem;
+  color: #9ca3af;
+}
+
+/* Scrollable body so it fits on mobile */
+.terms-body {
+  font-size: 0.85rem;
+  color: #9ca3af;
+  line-height: 1.6;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(31, 41, 55, 0.9);
+  overflow-y: auto;
+  max-height: 220px;
+}
+
+.terms-body ul {
+  margin-left: 1.1rem;
+  margin-top: 4px;
+}
+
+.terms-body li {
+  margin-bottom: 4px;
+}
+
+.terms-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 0.85rem;
+  color: #e5e7eb;
+}
+
+.terms-check input {
+  width: 16px;
+  height: 16px;
+}
+
+#mbTermsAccept {
+  margin-top: 10px;
+  align-self: flex-end;
+}
+
+
+
+
+
+/* Weekly stats summary cards */
+.weekly-stats-card{
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:16px;
+  margin-top:12px;
+  background:linear-gradient(180deg, rgba(255,255,255,.96), rgba(248,250,252,.94));
+  box-shadow:0 8px 24px rgba(15,23,42,.06);
+}
+.weekly-stats-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-bottom:12px;
+}
+.weekly-stats-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:12px;
+}
+.weekly-platform-card{
+  border:1px solid #e2e8f0;
+  border-radius:14px;
+  padding:12px;
+  background:#fff;
+  min-height:100%;
+}
+.weekly-platform-title{
+  font-weight:800;
+  margin:0 0 4px 0;
+}
+.weekly-platform-date{
+  font-size:12px;
+  color:#64748b;
+  margin-bottom:10px;
+}
+.weekly-platform-stats{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+}
+.weekly-stat-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  padding:6px 10px;
+  border-radius:999px;
+  font-size:12px;
+  background:#f8fafc;
+  border:1px solid #e2e8f0;
+  color:#334155;
+}
+.weekly-stats-empty{
+  border:1px dashed #cbd5e1;
+  border-radius:14px;
+  padding:14px;
+  background:#f8fafc;
+  color:#64748b;
+  font-size:13px;
+}
+
+/* ====================== MIKEY Chat Shell ====================== */
+.mikey-chat-shell{
+  display:grid;
+  grid-template-columns: 280px 1fr;
+  gap:14px;
+  align-items:stretch;
+}
+.mikey-side{
+  border:1px solid var(--border);
+  border-radius:16px;
+  background:rgba(255,255,255,.72);
+  padding:14px;
+  backdrop-filter:blur(6px);
+}
+.mikey-badge{
+  display:flex;
+  gap:12px;
+  align-items:center;
+  padding:10px;
+  border-radius:14px;
+  border:1px solid #dbeafe;
+  background:linear-gradient(180deg,#ffffff,#f8fbff);
+  margin-bottom:12px;
+}
+.mikey-avatar{
+  width:54px;
+  height:54px;
+  border-radius:50%;
+  object-fit:cover;
+  border:1px solid var(--border);
+  background:#f8fafc;
+}
+.mikey-name{ font-weight:900; letter-spacing:.02em; }
+.mikey-sub{ font-size:12px; color:#64748b; margin-top:2px; }
+.mikey-status{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  font-size:12px;
+  color:#0f766e;
+  margin-top:6px;
+}
+.mikey-status .dot{
+  width:8px; height:8px; border-radius:50%;
+  background:#22c55e;
+  box-shadow:0 0 0 2px #dcfce7;
+}
+.mikey-box{
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:12px;
+  background:#fff;
+}
+.mikey-box-title{ font-weight:800; margin-bottom:8px; }
+.mikey-chip{
+  width:100%;
+  text-align:left;
+  padding:10px 10px;
+  border-radius:12px;
+  border:1px solid #e2e8f0;
+  background:#f8fafc;
+  font-weight:600;
+  cursor:pointer;
+  margin-bottom:8px;
+}
+.mikey-chip:hover{ filter:brightness(0.98); }
+.mikey-tip{
+  font-size:12px;
+  color:#64748b;
+  margin-top:6px;
+}
+.mikey-chat{
+  border:1px solid var(--border);
+  border-radius:16px;
+  overflow:hidden;
+  background:#fff;
+  display:flex;
+  flex-direction:column;
+}
+.mikey-chat-top{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:12px 14px;
+  background:#111;
+  color:#fff;
+  font-weight:800;
+}
+.mikey-chat-title{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.mikey-mini{
+  width:26px; height:26px;
+  border-radius:50%;
+  object-fit:cover;
+}
+.mikey-iframe-wrap{
+  height:70vh;
+  min-height:520px;
+}
+
+/* ===== MIKEY Floating Bite-Size Pill (does NOT affect other pages) ===== */
+#mikeyPill{
+  position:fixed;
+  right:16px;
+  bottom:16px;
+  z-index:999;
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  padding:8px 12px 8px 9px;
+  border-radius:999px;
+  background:rgba(255,255,255,.85);
+  border:1px solid rgba(226,232,240,.9);
+  box-shadow:0 12px 30px rgba(0,0,0,.18);
+  backdrop-filter: blur(8px);
+  cursor:pointer;
+  user-select:none;
+}
+#mikeyPill:hover{ transform:translateY(-1px); }
+#mikeyPill:active{ transform:translateY(0px) scale(.99); }
+
+#mikeyPill .mikey-pill-avatar{
+  width:28px;
+  height:28px;
+  border-radius:50%;
+  object-fit:cover;
+  border:1px solid rgba(226,232,240,.9);
+  background:#f8fafc;
+  flex:0 0 auto;
+}
+#mikeyPill .mikey-pill-text{
+  display:flex;
+  flex-direction:column;
+  line-height:1.05;
+}
+#mikeyPill .mikey-pill-title{
+  font-weight:900;
+  font-size:12px;
+  letter-spacing:.02em;
+  color:#0f172a;
+}
+#mikeyPill .mikey-pill-sub{
+  font-size:11px;
+  color:#64748b;
+}
+
+#mikeyPill .mikey-thoughts{
+  margin-left:2px;
+  display:inline-flex;
+  gap:4px;
+  align-items:flex-end;
+}
+#mikeyPill .mikey-thoughts span{
+  width:5px; height:5px; border-radius:50%;
+  background:rgba(26,163,255,.95);
+  animation:mikeyDot 1s infinite ease-in-out;
+  opacity:.9;
+}
+#mikeyPill .mikey-thoughts span:nth-child(2){ animation-delay:.15s; opacity:.75; }
+#mikeyPill .mikey-thoughts span:nth-child(3){ animation-delay:.3s; opacity:.6; }
+
+@keyframes mikeyDot{
+  0%,100%{ transform:translateY(0); }
+  50%{ transform:translateY(-4px); }
+}
+
+/* Responsive */
+@media (max-width:900px){
+  .mikey-chat-shell{ grid-template-columns:1fr; }
+  .mikey-iframe-wrap{ height:65vh; min-height:520px; }
+
+
+
+
+.mikey-chat{
+  border:1px solid var(--border);
+  border-radius:16px;
+  overflow:hidden;
+  background:#fff;
+  display:flex;
+  flex-direction:column;
+  min-height:70vh;     /* ensures the whole box has height */
+}
+
+.mikey-chat-top{
+  flex:0 0 auto;       /* stays on top */
+}
+
+.mikey-iframe-wrap{
+  flex:1 1 auto;       /* fills the rest */
+  height:auto;         /* let flex control it */
+  min-height:520px;    /* keeps it tall */
+}
+
+/* Connect modal polish */
+#connectModal .modal-card{ max-width:560px; }
+#connectModal .input{ font-size:14px; }
+
+
+
+
+
+}
+
+
+/* ===== Profile bio polish ===== */
+#profile .prof-hero.bio-hero{
+  border:1px solid rgba(14,127,212,.18) !important;
+  border-radius:18px !important;
+  padding:16px !important;
+  background:linear-gradient(180deg, rgba(248,250,252,.96), rgba(255,255,255,.92)) !important;
+  box-shadow:0 12px 28px rgba(15,23,42,.06);
+}
+#profile .bio-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-bottom:10px;
+}
+#profile .bio-kicker{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:5px 10px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:#0369a1;
+  background:rgba(14,165,233,.10);
+  border:1px solid rgba(14,165,233,.18);
+}
+#profile .bio-subtext{
+  margin:6px 0 0;
+  color:#64748b;
+  font-size:13px;
+  line-height:1.5;
+}
+#profile .bio-input-wrap{
+  position:relative;
+}
+#profile #profBio{
+  min-height:150px;
+  resize:vertical;
+  padding:16px;
+  border-radius:16px;
+  border:1px solid rgba(148,163,184,.35);
+  background:linear-gradient(180deg,#ffffff,#f8fafc);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.85);
+  line-height:1.65;
+  font-size:14px;
+}
+#profile #profBio:focus{
+  outline:none;
+  border-color:rgba(26,163,255,.55);
+  box-shadow:0 0 0 4px rgba(26,163,255,.12);
+}
+#profile .bio-meta{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-top:10px;
+}
+#profile .bio-hint{
+  color:#64748b;
+  font-size:12px;
+}
+#profile .bio-preview{
+  margin-top:14px;
+  border:1px solid rgba(226,232,240,.95);
+  border-radius:16px;
+  background:#fff;
+  padding:14px;
+}
+#profile .bio-preview-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  margin-bottom:10px;
+  flex-wrap:wrap;
+}
+#profile .bio-preview-label{
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:#0f172a;
+}
+#profile .bio-preview-card{
+  border-radius:14px;
+  background:linear-gradient(135deg, rgba(15,23,42,.98), rgba(30,41,59,.96));
+  color:#e2e8f0;
+  padding:16px;
+  min-height:112px;
+  box-shadow:0 14px 26px rgba(15,23,42,.18);
+}
+#profile .bio-preview-name{
+  font-weight:800;
+  font-size:16px;
+}
+#profile .bio-preview-city{
+  font-size:12px;
+  color:#93c5fd;
+  margin-top:3px;
+}
+#profile .bio-preview-text{
+  margin-top:12px;
+  white-space:pre-wrap;
+  line-height:1.7;
+  color:#cbd5e1;
+}
+#profile .bio-preview-text.is-empty{
+  color:#94a3b8;
+  font-style:italic;
+}
+#profile .save-note{
+  font-size:12px;
+  color:#16a34a;
+  min-height:18px;
+}
+#profile .save-note.is-idle{
+  color:#64748b;
+}
+@media (max-width:740px){
+  #profile .bio-meta{align-items:flex-start;}
+}
+
+
+
+/* ===== Profile bio polish hotfix ===== */
+.bio-preview-card{position:relative;overflow:hidden}
+.bio-preview-card::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg, rgba(26,163,255,.10), rgba(14,127,212,.03));pointer-events:none}
+.bio-preview-name,.bio-preview-city,.bio-preview-text{position:relative}
+.bio-preview-text{white-space:pre-wrap}
+.save-note{font-weight:700}
+.save-note.is-saved{color:#166534}
+#profSave.is-saved{background:linear-gradient(180deg,#16a34a,#15803d)!important;box-shadow:0 8px 20px rgba(22,163,74,.25)!important}
+
+
+
+/* API-ready social status chip */
+.api-ready-note{
+  margin-top:8px;
+  padding:10px 12px;
+  border:1px solid #dbeafe;
+  border-radius:12px;
+  background:linear-gradient(180deg,#ffffff,#f8fbff);
+  font-size:12px;
+  color:#334155;
+}
+.api-ready-note b{ color:#0f172a; }
+
+</style>
+
+<style id="search-grid-polish">
+  /* Search page card polish */
+  #opps #dirGrid{
+    display:grid !important;
+    grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)) !important;
+    gap:14px !important;
+    align-items:stretch !important;
+    margin-top:10px;
+  }
+  #opps #dirGrid > *{min-width:0;}
+  #opps .dir-card{
+    display:grid !important;
+    grid-template-columns:48px 1fr;
+    gap:12px;
+    align-items:start;
+    height:100%;
+    min-height:190px;
+    padding:14px;
+    border-radius:16px;
+    background:rgba(255,255,255,.92);
+    border:1px solid rgba(226,232,240,.95);
+    box-shadow:0 10px 24px rgba(15,23,42,.08);
+  }
+  #opps .dir-card .avatar{
+    width:48px;
+    height:48px;
+    font-size:14px;
+    flex:none;
+  }
+  #opps .dir-card .dir-main{
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+    height:100%;
+  }
+  #opps .dir-name{font-size:16px; font-weight:800; line-height:1.2;}
+  #opps .dir-meta{margin-top:3px; min-height:32px;}
+  #opps .dir-tags-row{margin:8px 0 10px;}
+  #opps .dir-actions{
+    margin-top:auto;
+    display:flex;
+    gap:8px;
+    padding-top:12px;
+  }
+  #opps .dir-actions .btn{flex:1 1 0;}
+  @media (max-width:740px){
+    #opps #dirGrid{grid-template-columns:1fr !important;}
+    #opps .dir-card{min-height:auto;}
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+<div class="brand">
+<img alt="MusixBlvd" class="logo" src="images/mblogo.jpg"/>
+<span>MusixBlvd</span>
+</div>
+<nav aria-label="Primary" class="tabs" role="tablist">
+<button aria-selected="true" class="tab active" data-target="ai" type="button">MIKEY</button>
+<button class="tab" data-target="chat" type="button">Music Chat</button>
+<button class="tab" data-target="library" type="button">Library</button>
+<button class="tab" data-target="opps" type="button">Search</button>
+</nav>
+<div class="user">
+<button class="btn outline" id="profileTabBtn" type="button">Profile</button>
+<button class="btn outline" id="logoutBtn" type="button">Logout</button>
+</div>
+</header>
+<main class="page">
+
+
+
+<!-- AI Growth -->
+<section aria-label="AI Growth" class="panel active" id="ai" role="tabpanel">
+  <div class="panel-card ai-hero">
+    <div class="ai-robot">
+      <img alt="MusixBlvd AI Bot" class="mic-mascot" src="images/boulevard.png" />
+
+      <div class="ai-hero-copy">
+        <h2>Let’s analyze your socials</h2>
+        <p class="muted">
+          Grant Mikey permissions and I’ll analyze your social media accounts and platforms.
+        </p>
+
+        <!-- Providers -->
+        <div class="providers">
+          <button class="prov" data-p="instagram" type="button">Instagram</button>
+
+          <!-- ✅ YouTube: opens stats modal + fetches views (NOT the connect popup) -->
+          <button class="prov" data-p="youtube" type="button" id="ytOpenStats">YouTube</button>
+
+          <button class="prov" data-p="tiktok" type="button">TikTok</button>
+          <button class="prov" data-p="facebook" type="button">Facebook</button>
+          <button class="prov" data-p="twitter" type="button">X / Twitter</button>
+          <button class="prov" data-p="soundcloud" type="button">Soundcloud</button>
+          <button class="prov" data-p="spotify" type="button">Spotify</button>
+          <button class="prov" data-p="apple music" type="button">Apple Music</button>
+        </div>
+
+        <!-- Consent -->
+        <div class="consent">
+          <label class="check">
+            <input id="agree" type="checkbox" />
+            <span>I agree to connect my social accounts for read-only analytics.</span>
+          </label>
+        </div>
+
+        <!-- CTA -->
+        <div class="cta" style="margin-top:8px">
+          <button class="btn primary" disabled id="startAnalysis" type="button">Analyze my socials</button>
+        </div>
+
+        <!-- ✅ Optional: tiny helper text under YouTube -->
+        <p class="tiny muted" style="margin:10px 0 0">
+          Tip: Click <b>YouTube</b> to paste your channel link/@handle and pull view totals into your Profile totals.
+        </p>
+        <div class="api-ready-note" id="apiReadyNote">
+          <b>API-ready:</b> Instagram, TikTok, YouTube, Spotify, Facebook, SoundCloud, Apple Music, and X can all use the same light public-stats hook when your backend has data. If public stats are limited, the dashboard still falls back to weekly stats you save.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Progress overlay -->
+  <div aria-labelledby="scanTitle" aria-modal="true" class="modal hidden" id="scanModal" role="dialog">
+    <div class="modal-card">
+      <h3 id="scanTitle">Analyzing your content</h3>
+      <p class="muted">Pulling recent posts per platform, scoring engagement &amp; themes…</p>
+      <div class="actions">
+        <button class="btn outline" data-close type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+ <!-- Results -->
+<div class="ai-results hidden" id="aiResults">
+  <div class="panel-card">
+    <h3>Top Signals (last 60 days)</h3>
+    <ul class="signals" id="signalsList"></ul>
+  </div>
+
+  <div class="panel-card" style="margin-top:12px">
+    <h3>Cross-Platform Moves</h3>
+    <ul class="bullets" id="movesList"></ul>
+  </div>
+
+  <div class="panel-card" style="margin-top:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3>Weekly Plan</h3>
+      <button class="btn outline" id="regen" type="button">Regenerate</button>
+    </div>
+    <pre class="plan-box tiny" id="planBox"></pre>
+  </div>
+
+  <div class="panel-card" style="margin-top:12px">
+    <h3>Manual Stats Advice (Weekly)</h3>
+    <div id="manualAdviceBox" class="tiny"></div>
+  </div>
+
+  <div class="panel-card" style="margin-top:12px">
+    <h3>What Top Creators Are Doing</h3>
+    <div id="proInsightsBox" class="tiny"></div>
+  </div>
+</div>
+
+    <!-- Streaming Signals -->
+    <div class="panel-card hidden" id="streamSignalsCard" style="margin-top:12px">
+      <h3>Streaming Signals</h3>
+      <ul class="bullets" id="streamSignalsList"></ul>
+    </div>
+  </div>
+
+  <!-- ✅ YouTube Stats Modal (needed for your new YouTUBE CONNECT + STATS JS) -->
+  <div aria-labelledby="ytTitle" aria-modal="true" class="modal hidden" id="ytModal" role="dialog">
+    <div class="modal-card">
+      <h3 id="ytTitle">Connect YouTube + Pull Stats</h3>
+      <p class="muted" style="margin-top:4px">
+        Paste a channel <b>@handle</b> link (or @handle) OR a video link. We’ll pull view totals into your Profile totals.
+      </p>
+
+      <div style="margin-top:10px;display:grid;gap:10px">
+        <input
+          class="input"
+          id="ytInput"
+          placeholder="https://youtube.com/@yourchannel  (or)  @yourchannel  (or)  https://youtu.be/VIDEOID"
+          type="text"
+        />
+        <div class="tiny muted" id="ytModalStatus">Waiting for a link…</div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+          <button class="btn outline" data-close type="button">Cancel</button>
+          <button class="btn primary" id="ytSaveAndFetch" type="button">Save &amp; Fetch</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</section>
+<!-- CONNECT PROVIDER MODAL -->
+<div id="connectModal" class="modal hidden" role="dialog" aria-modal="true">
+  <div class="modal-card" style="max-width:420px">
+    <h3 id="connectTitle">Connect Account</h3>
+    <p class="muted" id="connectDesc">
+      Paste your profile link or username. This is used for read-only analytics.
+    </p>
+
+    <label class="tiny" style="display:block;margin-top:12px">
+      Profile link or @handle
+      <input
+        class="input"
+        id="connectInput"
+        placeholder="https://instagram.com/yourname or @yourname"
+        style="margin-top:6px"
+      />
+    </label>
+
+    <div class="tiny muted" id="connectHint" style="margin-top:6px">
+      Example: @yourname or full URL. Public stats will auto-load when available.
+    </div>
+
+    <div class="actions" style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn outline" id="connectCancel" type="button">Cancel</button>
+      <button class="btn primary" id="connectSave" type="button">Connect</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manual Stats Modal -->
+<div class="modal hidden" id="manualStatsModal" aria-hidden="true" role="dialog" aria-modal="true">
+  <div class="modal-card">
+    <h3 id="manualStatsTitle">Weekly Stats</h3>
+    <p class="muted" id="manualStatsDesc">Enter your numbers so Mikey can give better advice.</p>
+
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px">
+      <label class="tiny">Followers
+        <input class="input" id="msFollowers" type="number" min="0" placeholder="e.g. 1250">
+      </label>
+
+      <label class="tiny">Posts this week
+        <input class="input" id="msPostsPerWeek" type="number" min="0" placeholder="e.g. 4">
+      </label>
+
+      <label class="tiny">Avg likes per post
+        <input class="input" id="msAvgLikes" type="number" min="0" placeholder="e.g. 85">
+      </label>
+
+      <label class="tiny">Avg comments per post
+        <input class="input" id="msAvgComments" type="number" min="0" placeholder="e.g. 7">
+      </label>
+
+      <label class="tiny">Avg shares/saves (optional)
+        <input class="input" id="msAvgShares" type="number" min="0" placeholder="e.g. 12">
+      </label>
+
+      <label class="tiny">Niche / category
+        <input class="input" id="msNiche" type="text" placeholder="e.g. beats, R&B, podcast">
+      </label>
+    </div>
+
+    <div class="actions" style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+      <button class="btn outline" id="manualStatsCancel" type="button">Cancel</button>
+      <button class="btn primary" id="manualStatsSave" type="button">Save weekly stats</button>
+    </div>
+
+    <p class="tiny muted" id="manualStatsStatus" style="margin-top:8px"></p>
+  </div>
+</div>
+
+
+
+<section aria-label="AI Music Chat" class="panel" id="chat" role="tabpanel">
+  <div class="panel-card mikey-chat-shell">
+
+    <aside aria-label="MIKEY assistant panel" class="mikey-side">
+      <div class="mikey-badge">
+        <img alt="MIKEY" class="mikey-avatar" src="images/boulevard.png"/>
+        <div class="mikey-badge-text">
+          <div class="mikey-name">MIKEY</div>
+          <div class="mikey-sub">Your MusixBlvd assistant</div>
+          <div class="mikey-status"><span aria-hidden="true" class="dot"></span> Online</div>
+        </div>
+      </div>
+
+      <div class="mikey-box">
+        <div class="mikey-box-title">Try asking me:</div>
+        <button class="mikey-chip" type="button">How do I promote my new single this week?</button>
+        <button class="mikey-chip" type="button">Help me write a hook for a Detroit-style rap song</button>
+        <button class="mikey-chip" type="button">What should I post on Instagram + TikTok today?</button>
+        <button class="mikey-chip" type="button">Give me a 7-day release plan</button>
+        <div class="mikey-tip">Tip: click a prompt to copy it, then paste into the chat.</div>
+      </div>
+    </aside>
+
+    <div class="mikey-chat">
+      <!-- ✅ Title bar on top -->
+      <div class="mikey-chat-top">
+        <div class="mikey-chat-title">
+          <img alt="" aria-hidden="true" class="mikey-mini" src="images/boulevard.png"/>
+          <span>Music Chat with MIKEY</span>
+        </div>
+      </div>
+
+      <!-- ✅ Iframe fills remaining space -->
+      <div class="mikey-iframe-wrap">
+        <iframe
+          id="mikeyChatbaseFrame"
+          loading="lazy"
+          src="https://www.chatbase.co/chatbot-iframe/MlC54IMtZyrB028ZiNlge"
+          title="MIKEY Music Chat"
+          style="border:0; width:100%; height:100%; display:block;"
+          frameborder="0"
+        ></iframe>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- Library -->
+<section aria-label="Library" class="panel" id="library" role="tabpanel">
+<div class="panel-card lib-wrap">
+<header class="lib-head">
+<h2>Library</h2>
+<div class="lib-actions">
+<button class="btn outline" id="libRefresh" type="button">Refresh</button>
+</div>
+</header>
+<div class="lib-card">
+<h3>Connect Streaming Platforms</h3>
+<p class="muted">Grant Mikey access to pull your latest streams and track performances.</p>
+<div class="lib-providers">
+<button class="prov" data-p="spotify" type="button">Spotify</button>
+<button class="prov" data-p="apple" type="button">Apple Music</button>
+<button class="prov" data-p="soundcloud" type="button">SoundCloud</button>
+<button class="prov" data-p="youtube" type="button">YouTube</button>
+</div>
+<label class="check" style="margin-top:8px">
+<input id="libConsent" type="checkbox"/>
+<span>I agree to connect read-only analytics for my streaming accounts.</span>
+</label>
+<div class="row" style="gap:8px;margin-top:10px">
+<button class="btn primary" disabled="" id="libConnect" type="button">Connect Accounts</button>
+<span class="tiny muted"></span>
+</div>
+</div>
+<!-- Totals card (shows after Connect) -->
+<div class="lib-card panel-card" id="viewsCard" style="margin-top:12px; display:none;">
+<h3>Totals</h3>
+<div class="stats" id="viewsStats">
+<div class="stat"><span>Total video views</span><strong id="libTotalViews">—</strong></div>
+</div>
+<div class="tiny muted" id="viewsBreakdown" style="margin-top:6px"></div>
+</div>
+<div class="lib-card weekly-stats-card" id="libWeeklyStatsCard" style="display:none;">
+  <div class="weekly-stats-head">
+    <div>
+      <h3 style="margin:0">Weekly Stats</h3>
+      <div class="tiny muted">Only platforms with saved data will show here.</div>
+    </div>
+  </div>
+  <div class="weekly-stats-grid" id="libWeeklyStatsGrid"></div>
+</div>
+<div class="lib-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px">
+<div class="lib-card panel-card" style="margin:0">
+<h3>Upload a Song for Analysis</h3>
+<p class="muted">MP3/WAV/AAC/FLAC supported (browser decode). We’ll analyze loudness, peaks, stereo, and estimate BPM.</p>
+<div class="uploader">
+<input accept="audio/*" id="libFile" type="file"/>
+<button class="btn primary" disabled="" id="analyzeBtn" type="button">Analyze</button>
+</div>
+<audio controls="" id="player" style="width:100%;display:none;margin-top:10px"></audio>
+<div class="tiny muted" id="fileMeta" style="margin-top:6px"></div>
+</div>
+<div class="lib-card panel-card" style="margin:0">
+<h3>Analysis</h3>
+<div class="stats" id="analysisStats">
+<div class="stat"><span>Duration</span><strong>—</strong></div>
+<div class="stat"><span>Channels</span><strong>—</strong></div>
+<div class="stat"><span>Sample Rate</span><strong>—</strong></div>
+<div class="stat"><span>Peak (dBFS)</span><strong>—</strong></div>
+<div class="stat"><span>RMS (dBFS)</span><strong>—</strong></div>
+<div class="stat"><span>Dynamic Range</span><strong>—</strong></div>
+<div class="stat"><span>Estimated BPM</span><strong>—</strong></div>
+<div class="stat"><span>Clipping Detected</span><strong>—</strong></div>
+</div>
+</div>
+</div>
+<div class="lib-card panel-card">
+<h3>Advice</h3>
+<ul class="bullets" id="adviceList"></ul>
+<div class="tiny muted">Note: Loudness here is a quick estimate (not full LUFS). For releases, target ~−14 LUFS integrated for streaming normalization.</div>
+</div>
+</div>
+</section>
+<!-- SEARCH DIRECTORY -->
+<section aria-label="Search Directory" class="panel" id="opps" role="tabpanel">
+<div class="panel-card">
+<div class="opps-head" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+<h2>Search Directory</h2>
+<p class="tiny muted" style="margin:0">Find singers, producers, writers, dancers, DJs, and more. Chat is available only when they’re online.</p>
+</div>
+<div class="opps-toolbar" style="display:flex;flex-wrap:wrap;gap:10px;margin:12px 0">
+<label class="search" style="flex:1 1 220px;min-width:180px;position:relative;display:flex;align-items:center">
+<input class="input" id="dirSearch" placeholder="Search by name, city, tag…" style="padding-right:44px" type="search"/>
+<span class="kbd" style="position:absolute;right:10px;font-size:12px;color:#94a3b8;border:1px solid #e2e8f0;border-radius:6px;padding:1px 6px;background:#f8fafc">/</span>
+</label>
+<div class="dir-tags" style="display:flex;gap:6px;flex-wrap:wrap">
+<button class="btn outline tiny dir-filter active" data-role="all" type="button">All</button>
+<button class="btn outline tiny dir-filter" data-role="singer" type="button">Singers</button>
+<button class="btn outline tiny dir-filter" data-role="producer" type="button">Producers</button>
+<button class="btn outline tiny dir-filter" data-role="writer" type="button">Writers</button>
+<button class="btn outline tiny dir-filter" data-role="dancer" type="button">Dancers</button>
+<button class="btn outline tiny dir-filter" data-role="dj" type="button">DJs</button>
+<button class="btn outline tiny dir-filter" data-role="engineer" type="button">Engineers</button>
+<button class="btn outline tiny dir-filter" data-role="manager" type="button">Managers</button>
+<button class="btn outline tiny dir-filter" data-role="video" type="button">Videographers</button>
+</div>
+</div>
+<div aria-live="polite" class="opps-grid" id="dirGrid"></div>
+<div class="opps-empty hidden" id="dirEmpty">
+<p class="muted">No users match that yet. Try another role or keyword.</p>
+</div>
+</div>
+<!-- View User modal -->
+<div aria-hidden="true" aria-labelledby="dirProfileTitle" aria-modal="true" class="modal hidden" id="dirProfileModal" role="dialog">
+<div class="modal-card" role="document">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+<div class="avatar" id="dirProfAvatar" style="width:48px;height:48px">MB</div>
+<div>
+<h3 id="dirProfileTitle" style="margin:0">Creator</h3>
+<div class="muted tiny" id="dirProfileRole">—</div>
+</div>
+</div>
+<div id="dirAccessBar" style="margin-top:12px;padding:10px;border-radius:10px;border:1px solid #e2e8f0;background:#f8fafc;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+<div class="tiny muted" id="dirAccessStatus">
+            Locked — request required. Live platforms are public.
+          </div>
+<div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+<button class="btn outline tiny" id="dirRequestBtn" type="button">Request Access</button>
+<span class="tiny muted" id="dirPendingLabel" style="display:none;">Request sent — pending approval.</span>
+</div>
+</div>
+<div class="live-block" id="dirLiveBlock" style="margin-top:12px">
+<div class="live-pills" id="dirLivePills" style="display:flex;gap:6px;flex-wrap:wrap">
+<span class="tag live-pill" data-platform="spotify" hidden="" id="liveSpotify"></span>
+<span class="tag live-pill" data-platform="apple" hidden="" id="liveApple"></span>
+<span class="tag live-pill" data-platform="soundcloud" hidden="" id="liveSoundCloud"></span>
+<span class="tag live-pill" data-platform="ytmusic" hidden="" id="liveYtMusic"></span>
+<span class="tag" id="liveNone">— not streaming</span>
+</div>
+<div class="tiny muted" id="dirNowPlaying" style="margin-top:6px"></div>
+</div>
+<div class="actions" style="margin-top:14px">
+<button class="btn outline" data-close="" type="button">Close</button>
+<button class="btn primary" id="dirChatBtn" type="button">Chat (Demo)</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Profile -->
+<section aria-label="Profile" class="panel" id="profile" role="tabpanel">
+  <div class="panel-card">
+    <h2>Profile</h2>
+
+    <div class="prof-wrap" style="display:grid;grid-template-columns:260px 1fr;gap:16px">
+      <!-- LEFT -->
+      <aside>
+        <div class="prof-card" style="border:1px solid var(--border);border-radius:12px;padding:12px">
+          <h3 style="margin-top:0">Avatar</h3>
+
+          <div style="display:flex;align-items:center;gap:12px">
+            <img
+              alt="Avatar"
+              id="profPreview"
+              src=""
+              style="width:84px;height:84px;border-radius:50%;object-fit:cover;border:1px solid var(--border);background:#f8fafc"
+            />
+
+            <div style="display:flex;flex-direction:column;gap:4px;position:relative">
+              <input accept="image/*" id="profPic" style="position:absolute;left:-9999px;" type="file" />
+              <label class="btn outline tiny" for="profPic">Upload photo</label>
+              <div class="tiny muted"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="prof-card" style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:12px">
+          <h3 style="margin-top:0">Theme</h3>
+
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:8px">
+            <label class="tiny">
+              Accent Color
+              <input
+                id="profColor"
+                style="width:100%;height:40px;border:1px solid var(--border);border-radius:8px;margin-top:6px"
+                type="color"
+                value="#1aa3ff"
+              />
+            </label>
+
+            <label class="tiny">
+              Panel / Card Color
+              <input
+                id="profPanelColor"
+                style="width:100%;height:40px;border:1px solid var(--border);border-radius:8px;margin-top:6px"
+                type="color"
+                value="#ffffff"
+              />
+            </label>
+          </div>
+
+          <div style="margin-top:10px">
+            <label class="tiny">
+              Text Color (Profile only)
+              <input
+                id="profTextColor"
+                style="width:100%;height:40px;border:1px solid var(--border);border-radius:8px;margin-top:6px"
+                type="color"
+                value="#0f172a"
+              />
+            </label>
+          </div>
+
+          <hr style="margin:12px 0;border:none;border-top:1px solid var(--border)" />
+
+          <h4 style="margin:0 0 6px 0">Background</h4>
+
+          <label class="tiny" style="display:block;margin-bottom:6px">
+            <select class="input" id="profBgMode">
+              <option value="none">None (solid/gradient)</option>
+              <option value="preset">Use preset photo</option>
+              <option value="image">Upload my own photo</option>
+            </select>
+          </label>
+
+          <div class="hidden" id="bgUploadRow" style="display:flex;align-items:center;gap:8px">
+            <input accept="image/*" id="profBgImage" type="file" />
+          </div>
+
+          <div
+            class="hidden"
+            id="bgPresets"
+            style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px"
+          >
+            <button
+              class="bg-thumb"
+              data-bg="city-lights"
+              style="border:1px solid var(--border);border-radius:10px;overflow:hidden;height:56px;background:url('images/backgrounds/city-lights.jpg') center/cover"
+              title="City Lights"
+              type="button"
+            ></button>
+
+            <button
+              class="bg-thumb"
+              data-bg="studio"
+              style="border:1px solid var(--border);border-radius:10px;overflow:hidden;height:56px;background:url('images/backgrounds/studio.jpg') center/cover"
+              title="Music Studio"
+              type="button"
+            ></button>
+
+            <button
+              class="bg-thumb"
+              data-bg="concert"
+              style="border:1px solid var(--border);border-radius:10px;overflow:hidden;height:56px;background:url('images/backgrounds/concert.jpg') center/cover"
+              title="Concert"
+              type="button"
+            ></button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- RIGHT -->
+      <section>
+        <div class="prof-hero bio-hero" id="profHero" style="border:1px solid var(--border);border-radius:12px;padding:12px;background:#f8fafc">
+          <div class="bio-head">
+            <div>
+              <span class="bio-kicker">Artist Bio</span>
+              <h3 style="margin:8px 0 0 0">Write a clean professional intro</h3>
+              <p class="bio-subtext">This is the section people will read first, so keep it polished, clear, and easy to scan.</p>
+            </div>
+          </div>
+
+          <div class="bio-input-wrap">
+            <textarea
+              class="input"
+              id="profBio"
+              maxlength="2000"
+              placeholder="Example: Detroit-based artist blending melodic rap, R&amp;B, and performance-ready hooks. Open to collaborations, placements, and live bookings."
+              rows="6"
+            ></textarea>
+          </div>
+
+          <div class="bio-meta">
+            <div class="bio-hint">Tip: mention your sound, what you do, and what opportunities you want.</div>
+            <div class="tiny muted"><span id="bioCount">0</span> / 2000</div>
+          </div>
+
+          <div class="bio-preview" id="bioPreviewWrap">
+            <div class="bio-preview-top">
+              <div class="bio-preview-label">Profile Preview</div>
+              <div class="save-note is-idle" id="profSaveStatus">Changes save to your profile here</div>
+            </div>
+            <div class="bio-preview-card">
+              <div class="bio-preview-name" id="bioPreviewName">Your Artist Name</div>
+              <div class="bio-preview-city" id="bioPreviewCity">Your City</div>
+              <div class="bio-preview-text is-empty" id="bioPreviewText">Your bio preview will show here as you type.</div>
+            </div>
+          </div>
+
+          <div style="display:none">
+            <span id="profInitials"></span>
+            <span id="profNameDisplay"></span>
+            <span id="profCityDisplay"></span>
+          </div>
+        </div>
+
+        <div class="prof-card" style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:12px">
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+            <label>Name <input class="input" id="profName" placeholder="Artist / Producer name" /></label>
+            <label>City <input class="input" id="profCity" placeholder="Atlanta, GA" /></label>
+          </div>
+        </div>
+
+        <!-- Totals card -->
+        <div
+          class="prof-card"
+          id="profViewsCard"
+          style="border-radius:16px;padding:16px;background:radial-gradient(circle at top left,#0f172a,#020617);color:#e5e7eb;display:none;margin-top:12px"
+        >
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+            <div>
+              <div class="tiny" style="letter-spacing:.09em;text-transform:uppercase;opacity:.7">Totals</div>
+              <h3 style="margin:4px 0 0;font-size:1.25rem">Total Views</h3>
+              <p class="tiny" id="profViewsSub" style="margin:4px 0 0;opacity:.8"></p>
+            </div>
+
+            <div style="text-align:right">
+              <div id="profViewsTotal" style="font-size:2.1rem;font-weight:800;line-height:1">0</div>
+              <div class="tiny" style="opacity:.7">lifetime (demo)</div>
+            </div>
+          </div>
+
+          <div id="profViewsChips" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px"></div>
+        </div>
+        <div class="prof-card weekly-stats-card" id="profWeeklyStatsCard" style="display:none;">
+          <div class="weekly-stats-head">
+            <div>
+              <h3 style="margin:0">Weekly Stats Snapshot</h3>
+              <div class="tiny muted">Your latest saved stats show here by platform.</div>
+            </div>
+          </div>
+          <div class="weekly-stats-grid" id="profWeeklyStatsGrid"></div>
+        </div>
+
+        <!-- Social Accounts -->
+        <div class="prof-card" style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+            <h3 style="margin:0">Social Accounts</h3>
+            <span class="tiny muted"></span>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px">
+            <!-- Instagram -->
+            <div style="border:1px solid var(--border);border-radius:10px;padding:10px;display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-weight:700">Instagram</div>
+                <div class="tiny muted" id="igStatus">Not connected</div>
+              </div>
+              <button class="btn outline tiny" id="igToggle" type="button">Connect</button>
+            </div>
+
+            <!-- YouTube (SOCIAL in your JS) -->
+            <div style="border:1px solid var(--border);border-radius:10px;padding:10px;display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-weight:700">YouTube</div>
+                <div class="tiny muted" id="ytStatus">Not connected</div>
+              </div>
+              <button class="btn outline tiny" id="ytToggle" type="button">Connect</button>
+            </div>
+
+            <!-- TikTok -->
+            <div style="border:1px solid var(--border);border-radius:10px;padding:10px;display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-weight:700">TikTok</div>
+                <div class="tiny muted" id="ttStatus">Not connected</div>
+              </div>
+              <button class="btn outline tiny" id="ttToggle" type="button">Connect</button>
+            </div>
+
+            <!-- Twitter / X -->
+            <div style="border:1px solid var(--border);border-radius:10px;padding:10px;display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-weight:700">Twitter / X</div>
+                <div class="tiny muted" id="twStatus">Not connected</div>
+              </div>
+              <button class="btn outline tiny" id="twToggle" type="button">Connect</button>
+            </div>
+
+            <!-- Facebook -->
+            <div style="border:1px solid var(--border);border-radius:10px;padding:10px;display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-weight:700">Facebook</div>
+                <div class="tiny muted" id="fbStatus">Not connected</div>
+              </div>
+              <button class="btn outline tiny" id="fbToggle" type="button">Connect</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Streaming Connections -->
+        <div class="prof-card" style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+            <h3 style="margin:0">Streaming Connections</h3>
+            <span class="tiny muted"></span>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px">
+            <!-- Spotify -->
+            <div style="border:1px solid var(--border);border-radius:10px;padding:10px;display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-weight:700">Spotify</div>
+                <div class="tiny muted" id="spStatus">Not connected</div>
+              </div>
+              <button class="btn outline tiny" id="spToggle" type="button">Connect</button>
+            </div>
+
+            <!-- Apple Music -->
+            <div style="border:1px solid var(--border);border-radius:10px;padding:10px;display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-weight:700">Apple Music</div>
+                <div class="tiny muted" id="amStatus">Not connected</div>
+              </div>
+              <button class="btn outline tiny" id="amToggle" type="button">Connect</button>
+            </div>
+
+            <!-- SoundCloud -->
+            <div style="border:1px solid var(--border);border-radius:10px;padding:10px;display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-weight:700">SoundCloud</div>
+                <div class="tiny muted" id="scStatus">Not connected</div>
+              </div>
+              <button class="btn outline tiny" id="scToggle" type="button">Connect</button>
+            </div>
+
+           
+
+        <!-- Playlists -->
+        <div class="prof-card" style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+            <h3 style="margin:0">Playlists</h3>
+
+            <div style="display:flex;gap:8px;flex:1 1 420px">
+              <input class="input" id="plTitle" placeholder="Title (e.g., Chill Beats)" />
+              <input class="input" id="plUrl" placeholder="Link (Spotify/Apple/SoundCloud)" />
+              <button class="btn outline" id="plAdd" type="button">Add</button>
+            </div>
+          </div>
+
+          <ul class="bullets" id="plList" style="margin-top:10px"></ul>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap">
+          <button class="btn primary" id="profSave" type="button">Save Profile</button>
+          <button class="btn outline" id="profReset" type="button">Reset</button>
+          <span class="save-note is-idle" id="profSaveStatusInline">Profile changes are ready to save</span>
+        </div>
+      </section>
+    </div>
+  </div>
+</section>
+
+<!-- Terms modal -->
+<div aria-labelledby="mbTermsTitle" aria-modal="true" class="terms-overlay hidden" id="mbTermsModal" role="dialog">
+<div class="terms-card">
+<h2 id="mbTermsTitle">MusixBlvd Terms &amp; Conditions</h2>
+<p class="terms-summary">
+      Before you use MIKEY or upload any music, please agree to our basic rules and data usage.
+    </p>
+<div class="terms-body">
+<p>By continuing, you confirm that:</p>
+<ul>
+<li>You own (or have permission to use) the music and content you upload.</li>
+<li>You’ll avoid posting anything illegal, hateful, or harassing.</li>
+<li>You understand MIKEY is AI.</li>
+<li>
+          We may process your prompts and content to run MusixBlvd and improve the experience
+          (for example: library views, suggestions, and insights).
+        </li>
+</ul>
+<p style="margin-top:8px;">
+        You can read the full Terms &amp; Conditions here:
+        <a href="terms.html" rel="noopener" target="_blank">Open full Terms in a new tab</a>.
+      </p>
+</div>
+<label class="terms-check">
+<input id="mbTermsCheck" type="checkbox">
+<span>I have read and agree to the MusixBlvd Terms &amp; Conditions.</span>
+</input></label>
+<button class="btn primary" id="mbTermsAccept" type="button">
+      I Agree &amp; Continue
+    </button>
+</div>
+</div>
+
+
+<!-- YouTube Connect Modal -->
+<div class="modal hidden" id="ytModal" role="dialog" aria-modal="true" aria-labelledby="ytTitle">
+  <div class="modal-card">
+    <h3 id="ytTitle" style="margin:0 0 6px">Connect YouTube</h3>
+    <p class="muted tiny" style="margin:0 0 10px">
+      Paste a YouTube channel link (@handle) or a video link.
+    </p>
+
+    <input class="input" id="ytInput" placeholder="https://youtube.com/@yourname OR https://youtu.be/VIDEO_ID" />
+
+    <div class="tiny muted" id="ytModalStatus" style="margin-top:8px"></div>
+
+    <div class="actions" style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn outline" data-close type="button">Cancel</button>
+      <button class="btn primary" id="ytSaveAndFetch" type="button">Save & Get Stats</button>
+    </div>
+  </div>
+</div>
+
+
+
+
+
+</body>
+</html>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  /* =====================================================================
+     Tiny helpers
+  ====================================================================== */
+  const $  = (s, r=document) => r.querySelector(s);
+  const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+  const txt = (el, v) => { if (el) el.textContent = v; };
+  const show = el => el && el.removeAttribute('hidden');
+  const hide = el => el && el.setAttribute('hidden','');
+
+  /* =====================================================================
+     Core page nav + sync helpers
+  ====================================================================== */
+  const PANELS = ['ai','chat','library','opps','profile'];
+
+  function showPanel(panelId){
+    PANELS.forEach((id) => {
+      const panel = document.getElementById(id);
+      if (!panel) return;
+      panel.classList.toggle('active', id === panelId);
+      panel.style.display = id === panelId ? 'block' : 'none';
+      panel.hidden = id !== panelId;
+    });
+
+    $$('.tabs .tab').forEach((btn) => {
+      const active = btn.dataset.target === panelId;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+
+    if (panelId === 'profile') {
+      window.mbRenderProfileViews?.();
+      refreshProfileConnectionUI?.(normalizeProfile(loadProfile()));
+    }
+  }
+
+  function syncAnalyzeButton(){
+    const start = document.getElementById('startAnalysis');
+    const agree = document.getElementById('agree');
+    const hasProvider = !!document.querySelector('#ai .providers .prov.active');
+    if (start) start.disabled = !(agree?.checked && hasProvider);
+  }
+  window.mbSyncAnalyzeButton = syncAnalyzeButton;
+
+
+  /* =====================================================================
+     API-ready helpers (Instagram + TikTok + OpenAI)
+     - These use backend endpoints so secrets stay off the page.
+     - If no backend exists yet, the site keeps working with local/manual stats.
+  ====================================================================== */
+  const MB_API_BASE = (location.protocol === 'file:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+    ? 'http://localhost:3001'
+    : '';
+
+  const MB_API_ENDPOINTS = {
+    socialInsights: `${MB_API_BASE}/api/social-insights`,
+    mikeyAdvice: `${MB_API_BASE}/api/mikey-advice`
+  };
+
+  function normalizeHandleOrUrl(value) {
+    return String(value || '').trim();
+  }
+
+  function upsertManualStat(platform, patch) {
+    const store = loadManualStatsStore();
+    store.byPlatform = store.byPlatform || {};
+    store.byPlatform[platform] = store.byPlatform[platform] || [];
+    const history = store.byPlatform[platform];
+    const today = new Date().toISOString().slice(0, 10);
+    const last = history.length ? history[history.length - 1] : null;
+    const lastDay = last?.date ? String(last.date).slice(0, 10) : '';
+
+    const entry = {
+      followers: Number(patch.followers ?? last?.followers ?? 0),
+      posts: Number(patch.posts ?? last?.posts ?? 0),
+      likes: Number(patch.likes ?? last?.likes ?? 0),
+      comments: Number(patch.comments ?? last?.comments ?? 0),
+      shares: Number(patch.shares ?? last?.shares ?? 0),
+      views: Number(patch.views ?? last?.views ?? 0),
+      niche: String(patch.niche ?? last?.niche ?? 'music'),
+      source: patch.source || last?.source || 'manual',
+      date: new Date().toISOString()
+    };
+
+    if (last && lastDay === today) {
+      history[history.length - 1] = { ...last, ...entry };
+    } else {
+      history.push(entry);
+    }
+
+    saveManualStatsStore(store);
+    return entry;
+  }
+
+  function savePlatformViews(platform, views) {
+    const n = Number(views || 0);
+    if (!n) return;
+    const mb = loadJSON('mb_views', {});
+    mb.perPlatform = mb.perPlatform || {};
+    mb.perPlatform[platform] = n;
+    mb.total = Object.values(mb.perPlatform).reduce((a, b) => a + Number(b || 0), 0);
+    mb.ts = Date.now();
+    saveJSON('mb_views', mb);
+    window.mbRenderProfileViews?.();
+  }
+
+  async function fetchBackendSocialInsights(platform, identifier) {
+    const clean = normalizeHandleOrUrl(identifier);
+    if (!clean) return null;
+
+    try {
+      const res = await fetch(MB_API_ENDPOINTS.socialInsights, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform, identifier: clean })
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (!data || data.ok === false) return null;
+      return data;
+    } catch {
+      return null;
+    }
+  }
+
+  async function enrichPlatformFromAPI(platform, identifier) {
+    const key = String(platform || '').toLowerCase();
+    const data = await fetchBackendSocialInsights(key, identifier);
+    if (!data) return null;
+
+    const stats = {
+      followers: Number(data.followers ?? data.follower_count ?? data.subscribers ?? 0),
+      posts: Number(data.posts ?? data.media_count ?? data.video_count ?? data.track_count ?? 0),
+      likes: Number(data.likes ?? data.avg_likes ?? data.favorite_count ?? 0),
+      comments: Number(data.comments ?? data.avg_comments ?? data.comment_count ?? 0),
+      shares: Number(data.shares ?? data.avg_shares ?? data.reposts ?? 0),
+      views: Number(data.views ?? data.total_views ?? data.profile_views ?? data.play_count ?? data.monthly_listeners ?? 0),
+      niche: String(data.niche || 'music'),
+      source: 'api'
+    };
+
+    const numericValues = [stats.followers, stats.posts, stats.likes, stats.comments, stats.shares, stats.views];
+    const hasAnyStat = numericValues.some((v) => Number(v || 0) > 0);
+    if (!hasAnyStat) return null;
+
+    upsertManualStat(key, stats);
+    if (stats.views) savePlatformViews(key, stats.views);
+    window.mbRenderManualAdvice?.();
+    window.mbRenderWeeklyStats?.();
+    return stats;
+  }
+
+  async function fetchOpenAIMikeyAdvice(payload) {
+    try {
+      const res = await fetch(MB_API_ENDPOINTS.mikeyAdvice, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (!data || data.ok === false) return null;
+      return data;
+    } catch {
+      return null;
+    }
+  }
+
+  async function enhanceMikeyResultsWithAI() {
+    const store = loadManualStatsStore();
+    const payload = {
+      profile: normalizeProfile(loadProfile()),
+      weeklyStats: store.byPlatform || {}
+    };
+
+    const ai = await fetchOpenAIMikeyAdvice(payload);
+    if (!ai) return false;
+
+    if (Array.isArray(ai.signals) && signalsList) {
+      signalsList.innerHTML = ai.signals.map((x) => `<li>${x}</li>`).join('');
+    }
+    if (Array.isArray(ai.moves) && movesList) {
+      movesList.innerHTML = ai.moves.map((x) => `<li>${x}</li>`).join('');
+    }
+    if (Array.isArray(ai.plan) && planBox) {
+      planBox.textContent = ai.plan.join('\n');
+    } else if (typeof ai.plan === 'string' && planBox) {
+      planBox.textContent = ai.plan;
+    }
+    if (Array.isArray(ai.proInsights) && proInsightsBox) {
+      proInsightsBox.innerHTML = ai.proInsights.map((x) => `<div style="margin:4px 0">• ${x}</div>`).join('');
+    }
+    return true;
+  }
+
+  document.addEventListener('click', (e) => {
+    const tab = e.target.closest('.tabs .tab[data-target]');
+    if (tab) {
+      e.preventDefault();
+      showPanel(tab.dataset.target);
+      return;
+    }
+
+    const profileBtn = e.target.closest('#profileTabBtn');
+    if (profileBtn) {
+      e.preventDefault();
+      showPanel('profile');
+      return;
+    }
+
+    const logoutBtn = e.target.closest('#logoutBtn');
+    if (logoutBtn) {
+      e.preventDefault();
+      window.location.href = 'index.html';
+    }
+  });
+
+  document.getElementById('agree')?.addEventListener('change', syncAnalyzeButton);
+
+  /* =====================================================================
+     DOM aliases for modals / fields used later in the script
+  ====================================================================== */
+  const manualModal   = document.getElementById('manualStatsModal');
+  const msTitle       = document.getElementById('manualStatsTitle');
+  const msDesc        = document.getElementById('manualStatsDesc');
+  const msStatus      = document.getElementById('manualStatsStatus');
+  const msFollowers   = document.getElementById('msFollowers');
+  const msPosts       = document.getElementById('msPostsPerWeek');
+  const msLikes       = document.getElementById('msAvgLikes');
+  const msComments    = document.getElementById('msAvgComments');
+  const msShares      = document.getElementById('msAvgShares');
+  const msNiche       = document.getElementById('msNiche');
+  const msCancel      = document.getElementById('manualStatsCancel');
+  const msSave        = document.getElementById('manualStatsSave');
+
+  const connectModal     = document.getElementById('connectModal');
+  const connectTitleEl   = document.getElementById('connectTitle');
+  const connectDescEl    = document.getElementById('connectDesc');
+  const connectInputEl   = document.getElementById('connectInput');
+  const connectHintEl    = document.getElementById('connectHint');
+  const connectCancelBtn = document.getElementById('connectCancel');
+  const connectSaveBtn   = document.getElementById('connectSave');
+
+  PANELS.forEach((id) => {
+    const panel = document.getElementById(id);
+    if (!panel) return;
+    const active = panel.classList.contains('active');
+    panel.style.display = active ? 'block' : 'none';
+    panel.hidden = !active;
+  });
+  syncAnalyzeButton();
+
+  /* =====================================================================
+     Shared storage helpers (ONE source of truth)
+  ====================================================================== */
+  const loadJSON = (key, fallback) => {
+    try { return JSON.parse(localStorage.getItem(key) || '') ?? fallback; }
+    catch { return fallback; }
+  };
+  const saveJSON = (key, val) => localStorage.setItem(key, JSON.stringify(val));
+
+  /* =====================================================================
+     Shared views loader (Library + Profile)
+  ====================================================================== */
+  const loadViewsData = () => loadJSON('mb_views', {});
+
+  /* =====================================================================
+     Public LIVE demo data (per user id)
+  ====================================================================== */
+  const LIVE_BY_USER = {
+    u1:{spotify:{live:true,listeners:248,nowPlaying:'Midnight Drive — KAM',url:'#'},apple:{live:false},soundcloud:{live:true,listeners:73,nowPlaying:'808 Sketch v2 — MB Demo',url:'#'},ytmusic:{live:false}},
+    u2:{spotify:{live:false},apple:{live:false},soundcloud:{live:true,listeners:31,nowPlaying:'TR-808 Pack Teaser',url:'#'},ytmusic:{live:false}},
+    u3:{spotify:{live:false},apple:{live:false},soundcloud:{live:false},ytmusic:{live:true,listeners:112,nowPlaying:'Live writing: Afro toplines',url:'#'}},
+    u4:{spotify:{live:false},apple:{live:false},soundcloud:{live:false},ytmusic:{live:false}},
+    u5:{spotify:{live:false},apple:{live:false},soundcloud:{live:false},ytmusic:{live:false}},
+    u6:{spotify:{live:true,listeners:420,nowPlaying:'Club Latin Mix (Live)',url:'#'},apple:{live:false},soundcloud:{live:true,listeners:58,nowPlaying:'Pre-show warmup',url:'#'},ytmusic:{live:false}},
+    u7:{spotify:{live:false},apple:{live:false},soundcloud:{live:false},ytmusic:{live:false}},
+    u8:{spotify:{live:false},apple:{live:false},soundcloud:{live:false},ytmusic:{live:false}}
+  };
+  window.LIVE_BY_USER = LIVE_BY_USER;
+
+  /* =====================================================================
+     Brand logos + labels
+  ====================================================================== */
+  const PLATFORM_META = {
+    spotify:    { label: 'Spotify',      logo: 'images/brands/spotify.jpg' },
+    apple:      { label: 'Apple Music',  logo: 'images/brands/applemusic.png' },
+    soundcloud: { label: 'SoundCloud',   logo: 'images/brands/soundcloud.png' },
+    ytmusic:    { label: 'YouTube',      logo: 'images/brands/youtube.png' }
+  };
+
+  /* =====================================================================
+     MODAL MANAGER (works for ALL modals on the page)
+  ====================================================================== */
+  function closeModal(modal){
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden','true');
+  }
+  function openModal(modal){
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden','false');
+  }
+
+  $$('.modal').forEach(modal => {
+    const card = modal.querySelector('.modal-card');
+
+    // Start hidden
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden','true');
+
+    // Backdrop click → close
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal(modal);
+    });
+
+    // Inside card: close button or stop propagation
+    card?.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-close]');
+      if (btn) { closeModal(modal); return; }
+      e.stopPropagation();
+    });
+  });
+
+  // Document-level close buttons
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-close]');
+    if (!btn) return;
+    const owningModal = btn.closest('.modal');
+    if (owningModal) closeModal(owningModal);
+  });
+
+  // Esc closes the topmost open modal
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const open = document.querySelector('.modal:not(.hidden)');
+    if (open) closeModal(open);
+  });
+
+  /* =====================================================================
+     PROFILE STORAGE (shared normalizer) ✅ single definition
+  ====================================================================== */
+  const loadProfile = () => loadJSON('mb_profile', {});
+  const saveProfile = (p) => {
+    saveJSON('mb_profile', p);
+    window.MB = window.MB || {};
+    window.MB.profile = p;
+    document.dispatchEvent(new CustomEvent('mb:profile-updated', { detail: p }));
+  };
+
+  const normalizeProfile = (raw) => {
+    const base = {
+      name: '',
+      city: '',
+      bio: '',
+      pic: '',
+      theme: 'default',
+      color: '#1aa3ff',
+      panelColor: '#f8fafc',
+      textColor: '#0f172a',
+      socials: { ig: '', tw: '', yt: '', sc: '', tt: '', fb: '' },
+      streamUrls: { spotify:'', apple:'', soundcloud:'', ytmusic:'' },
+      playlists: [],
+      streaming: { spotify: false, apple: false, soundcloud: false, ytmusic: false },
+      socialConnected: { ig: false, tw: false, yt: false, tt: false, fb: false },
+      bg: { mode: 'none', preset: '', image: '' }
+    };
+
+    const p = Object.assign({}, base, raw || {});
+    p.socials = Object.assign({}, base.socials, p.socials || {});
+    p.streamUrls = Object.assign({}, base.streamUrls, p.streamUrls || {});
+    p.streaming = Object.assign({}, base.streaming, p.streaming || {});
+    p.socialConnected = Object.assign({}, base.socialConnected, p.socialConnected || {});
+    p.bg = Object.assign({}, base.bg, p.bg || {});
+    return p;
+  };
+
+  /* =====================================================================
+     Provider mapping (ONE mapping used everywhere)
+  ====================================================================== */
+  const mapProviderToProfile = (rawKey) => {
+    const k = String(rawKey || '').trim().toLowerCase();
+
+    // Social connects
+    if (k === 'instagram') return { type: 'social', key: 'ig' };
+    if (k === 'youtube')   return { type: 'social', key: 'yt' };
+    if (k === 'tiktok')    return { type: 'social', key: 'tt' };
+    if (k === 'facebook')  return { type: 'social', key: 'fb' };
+    if (k === 'twitter' || k === 'x' || k === 'x / twitter' || k === 'x/twitter' || k.includes('twitter')) {
+      return { type: 'social', key: 'tw' };
+    }
+
+    // Streaming connects
+    if (k === 'spotify') return { type: 'stream', key: 'spotify' };
+    if (k === 'soundcloud') return { type: 'stream', key: 'soundcloud' };
+    if (k === 'apple music' || k === 'apple') return { type: 'stream', key: 'apple' };
+
+    // Optional
+    if (k === 'yt music' || k === 'youtube music' || k === 'ytmusic') {
+      return { type: 'stream', key: 'ytmusic' };
+    }
+
+    return null;
+  };
+
+  /* =====================================================================
+     OPTIONAL: refresh Profile connection UI instantly (if IDs exist)
+  ====================================================================== */
+  const setText = (id, text) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+
+  const paintBtn = (btn, connected) => {
+    if (!btn) return;
+    btn.style.transition = 'all .15s ease';
+    if (connected) {
+      btn.style.background = '#16a34a';
+      btn.style.borderColor = '#16a34a';
+      btn.style.color = '#ffffff';
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+    } else {
+      btn.style.background = '';
+      btn.style.borderColor = '';
+      btn.style.color = '';
+      btn.style.opacity = '.55';
+      btn.style.cursor = 'not-allowed';
+    }
+  };
+
+  const setDisconnectOnlyButton = (btnId, connected) => {
+    const b = document.getElementById(btnId);
+    if (!b) return;
+    b.textContent = connected ? 'Disconnect' : 'Connect via Mikey';
+    b.disabled = !connected;
+    b.setAttribute('aria-disabled', connected ? 'false' : 'true');
+    paintBtn(b, connected);
+  };
+
+  const refreshProfileConnectionUI = (pRaw) => {
+    const p = normalizeProfile(pRaw);
+
+    // Streaming
+    setText('spStatus', p.streaming.spotify ? 'Connected' : 'Not connected');
+    setDisconnectOnlyButton('spToggle', p.streaming.spotify);
+
+    setText('amStatus', p.streaming.apple ? 'Connected' : 'Not connected');
+    setDisconnectOnlyButton('amToggle', p.streaming.apple);
+
+    setText('scStatus', p.streaming.soundcloud ? 'Connected' : 'Not connected');
+    setDisconnectOnlyButton('scToggle', p.streaming.soundcloud);
+
+    setText('ytmStatus', p.streaming.ytmusic ? 'Connected' : 'Not connected');
+    setDisconnectOnlyButton('ytmToggle', p.streaming.ytmusic);
+
+    // Social
+    setText('igStatus', p.socialConnected.ig ? 'Connected' : 'Not connected');
+    setDisconnectOnlyButton('igToggle', p.socialConnected.ig);
+
+    setText('ytStatus', p.socialConnected.yt ? 'Connected' : 'Not connected');
+    setDisconnectOnlyButton('ytToggle', p.socialConnected.yt);
+
+    setText('ttStatus', p.socialConnected.tt ? 'Connected' : 'Not connected');
+    setDisconnectOnlyButton('ttToggle', p.socialConnected.tt);
+
+    setText('twStatus', p.socialConnected.tw ? 'Connected' : 'Not connected');
+    setDisconnectOnlyButton('twToggle', p.socialConnected.tw);
+
+    setText('fbStatus', p.socialConnected.fb ? 'Connected' : 'Not connected');
+    setDisconnectOnlyButton('fbToggle', p.socialConnected.fb);
+  };
+
+  /* =====================================================================
+   YOUTUBE CONNECT + STATS (FULLY CONNECTED TO MIKEY)
+   ✅ Fetches real views
+   ✅ Saves to mb_views (Profile totals)
+   ✅ Saves to mb_manual_stats (Mikey AI)
+   ✅ Prevents duplicate entries (same day update)
+===================================================================== */
+const YT_KEY = "AIzaSyCGA_Fz_xianWV8NzgHvgTiQV6bGrkB0k4";
+
+function extractYouTubeVideoId(url) {
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes("youtu.be")) return u.pathname.replace("/", "");
+    if (u.searchParams.get("v")) return u.searchParams.get("v");
+    const parts = u.pathname.split("/").filter(Boolean);
+    const shortsIndex = parts.indexOf("shorts");
+    if (shortsIndex !== -1 && parts[shortsIndex + 1]) return parts[shortsIndex + 1];
+  } catch {}
+  return "";
+}
+
+async function fetchVideoStats(videoId) {
+  const url = `https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${encodeURIComponent(videoId)}&key=${encodeURIComponent(YT_KEY)}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  const item = data?.items?.[0];
+  if (!item) throw new Error(data?.error?.message || "Video not found");
+  return item.statistics;
+}
+
+async function fetchChannelStatsByHandle(text) {
+  const m = text.match(/@([A-Za-z0-9._-]+)/);
+  const handle = m ? m[1] : "";
+  if (!handle) throw new Error("Paste a channel @handle OR video link.");
+
+  const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(handle)}&maxResults=1&key=${encodeURIComponent(YT_KEY)}`;
+  const sres = await fetch(searchUrl);
+  const sdata = await sres.json();
+  const channelId = sdata?.items?.[0]?.snippet?.channelId || sdata?.items?.[0]?.id?.channelId;
+  if (!channelId) throw new Error("Channel not found.");
+
+  const chanUrl = `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${encodeURIComponent(channelId)}&key=${encodeURIComponent(YT_KEY)}`;
+  const cres = await fetch(chanUrl);
+  const cdata = await cres.json();
+  const item = cdata?.items?.[0];
+  if (!item) throw new Error("Channel stats not found.");
+  return item.statistics;
+}
+
+function saveYoutubeViewsToStorage(views) {
+  // 🔹 1. Save for Profile / Library totals
+  let mb = loadJSON("mb_views", {});
+  mb.perPlatform = mb.perPlatform || {};
+  mb.perPlatform.youtube = Number(views || 0);
+  mb.total = Object.values(mb.perPlatform).reduce((a, b) => a + Number(b || 0), 0);
+  mb.ts = Date.now();
+  saveJSON("mb_views", mb);
+
+  // 🔹 2. Save for Mikey AI (THIS WAS MISSING BEFORE)
+  let manual = loadJSON("mb_manual_stats", {});
+  manual.byPlatform = manual.byPlatform || {};
+  manual.byPlatform.youtube = manual.byPlatform.youtube || [];
+
+  const history = manual.byPlatform.youtube;
+  const last = history.length ? history[history.length - 1] : null;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const lastDay = last?.date ? String(last.date).slice(0, 10) : "";
+
+  const entry = {
+    followers: Number(last?.followers || 0),
+    posts: Number(last?.posts || 0),
+    likes: Number(last?.likes || 0),
+    comments: Number(last?.comments || 0),
+    shares: Number(last?.shares || 0),
+    niche: String(last?.niche || "music"),
+    views: Number(views || 0),
+    date: new Date().toISOString()
+  };
+
+  // ✅ Prevent duplicate spam (same day overwrite)
+  if (last && lastDay === today) {
+    history[history.length - 1] = { ...last, ...entry };
+  } else {
+    history.push(entry);
+  }
+
+  saveJSON("mb_manual_stats", manual);
+
+  // 🔹 3. Refresh UI everywhere
+  window.mbRenderProfileViews?.();
+  window.mbRenderManualAdvice?.();
+}
+
+// Open modal manually if button exists
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest('#ytOpenStats');
+  if (!btn) return;
+  const modal = document.getElementById("ytModal");
+  if (modal) openModal(modal);
+});
+
+// Fetch + save
+document.getElementById("ytSaveAndFetch")?.addEventListener("click", async () => {
+  const input = document.getElementById("ytInput");
+  const status = document.getElementById("ytModalStatus");
+  const modal = document.getElementById("ytModal");
+
+  const val = (input?.value || "").trim();
+
+  if (!val) {
+    if (status) status.textContent = "Paste a YouTube link.";
+    return;
+  }
+
+  if (status) status.textContent = "Fetching YouTube stats…";
+
+  try {
+    const vid = extractYouTubeVideoId(val);
+
+    if (vid) {
+      const stats = await fetchVideoStats(vid);
+      const views = stats?.viewCount || 0;
+      saveYoutubeViewsToStorage(views);
+      if (status) status.textContent = `✅ Video views: ${Number(views).toLocaleString()}`;
+    } else {
+      const cstats = await fetchChannelStatsByHandle(val);
+      const views = cstats?.viewCount || 0;
+      saveYoutubeViewsToStorage(views);
+      if (status) status.textContent = `✅ Channel views: ${Number(views).toLocaleString()}`;
+    }
+
+    window.mbSyncAnalyzeButton?.();
+    setTimeout(() => { closeModal(modal); }, 700);
+  } catch (err) {
+    if (status) status.textContent = `❌ ${err?.message || "Failed to fetch"}`;
+  }
+});
+ /* =====================================================================
+   2) Mikey Analyze (real stats + top creator insights + YouTube views)
+   ✅ AUTO-CONNECTS PROFILE
+   ✅ Uses saved weekly stats from mb_manual_stats
+   ✅ Removes demo answers
+   ✅ Adds "What Top Creators Are Doing"
+   ✅ Includes YouTube view-based advice
+===================================================================== */
+(function () {
+  const start   = $('#startAnalysis');
+  const agree   = $('#agree');
+  const modal   = $('#scanModal');
+  const results = $('#aiResults');
+
+  const signalsList = $('#signalsList');
+  const movesList   = $('#movesList');
+  const planBox     = $('#planBox');
+  const proInsightsBox = $('#proInsightsBox');
+
+  const provBtns = $$('#ai .providers .prov');
+
+  const mic  = $('.mic-mascot');
+  const talk = (on) => mic?.classList.toggle('is-talking', !!on);
+
+  const anySel = () => !!$('#ai .providers .prov.active');
+  const sync = () => { if (start) start.disabled = !(agree?.checked && anySel()); };
+
+  (function restoreMikeyProviderButtons() {
+    const p = normalizeProfile(loadProfile());
+
+    provBtns.forEach((btn) => {
+      const keyRaw = btn.dataset.p || btn.getAttribute('data-p') || btn.textContent;
+      const mapped = mapProviderToProfile(keyRaw);
+      if (!mapped) return;
+
+      const isOn =
+        mapped.type === 'stream'
+          ? !!p.streaming[mapped.key]
+          : !!p.socialConnected[mapped.key];
+
+      btn.classList.toggle('active', isOn);
+    });
+
+    refreshProfileConnectionUI(p);
+    sync();
+  })();
+
+  agree?.addEventListener('change', sync);
+  document.addEventListener('mb:profile-updated', sync);
+  sync();
+
+  function renderStreamSignals() {
+    const card = $('#streamSignalsCard');
+    const list = $('#streamSignalsList');
+    if (!card || !list) return;
+
+    const p = normalizeProfile(loadProfile());
+    const s = p.streaming || {};
+    const city = p.city || 'your top city';
+    const out = [];
+
+    if (s.spotify) out.push(`Spotify: listeners and saves matter most in ${city}.`);
+    if (s.apple) out.push('Apple Music: test stronger intros in the first 15 seconds.');
+    if (s.soundcloud) out.push('SoundCloud: reposts and comments can help tracks spread faster.');
+    if (s.ytmusic) out.push('YouTube Music: titles, thumbnails, and clip strategy matter.');
+
+    list.innerHTML = out.map((x) => `<li>${x}</li>`).join('');
+    card.classList.toggle('hidden', !(s.spotify || s.apple || s.soundcloud || s.ytmusic));
+  }
+
+  function prettyName(k) {
+    return ({
+      instagram: 'Instagram',
+      youtube: 'YouTube',
+      tiktok: 'TikTok',
+      facebook: 'Facebook',
+      twitter: 'X / Twitter',
+      spotify: 'Spotify',
+      soundcloud: 'SoundCloud',
+      apple: 'Apple Music',
+      ytmusic: 'YouTube Music'
+    }[String(k || '').toLowerCase()] || k);
+  }
+
+  function generateProInsights(platform, stats) {
+    const insights = [];
+    const niche = String(stats?.niche || '').toLowerCase();
+
+    if (platform === 'instagram') {
+      insights.push('📈 Top creators usually grow by posting Reels consistently with a strong first 2-second hook.');
+      insights.push('🎯 Bigger pages often use bold cover text, clean visuals, and repeat winning formats.');
+      insights.push('📌 Many influencers pin their top 3 posts to control first impressions.');
+    }
+
+    if (platform === 'tiktok') {
+      insights.push('🔥 A lot of TikTok growth comes from repeating the same content format until it catches.');
+      insights.push('🎬 Strong TikTok creators usually hook viewers in under 1.5 seconds.');
+      insights.push('📊 Posting volume matters — consistency often beats perfection.');
+    }
+
+    if (platform === 'youtube') {
+      insights.push('🎥 YouTubers often grow faster by improving titles and thumbnails before anything else.');
+      insights.push('⚡ Shorts are commonly used to feed viewers into longer videos.');
+      insights.push('📈 Retention usually matters more than raw views.');
+    }
+
+    if (platform === 'facebook') {
+      insights.push('📘 Facebook creators often win with community-style posts that invite opinions and shares.');
+      insights.push('👥 Pages grow faster when posts feel conversational instead of promotional.');
+    }
+
+    if (platform === 'twitter') {
+      insights.push('🧵 Fast-growing X creators often post short takes daily and use threads to build authority.');
+      insights.push('💬 Replying to bigger accounts is a common strategy to get discovered.');
+    }
+
+    if (platform === 'spotify') {
+      insights.push('🎧 Artists often use short-form content off-platform to drive streams back to Spotify.');
+      insights.push('📀 Consistent releases and repeat promotion usually outperform random drops.');
+    }
+
+    if (platform === 'soundcloud') {
+      insights.push('🔊 SoundCloud artists often grow through repost networks, comments, and frequent uploads.');
+      insights.push('🚀 Momentum usually comes from staying active, not waiting for perfect releases.');
+    }
+
+    if (platform === 'apple' || platform === 'ytmusic') {
+      insights.push('🎶 Streaming growth usually follows audience building on social platforms first.');
+    }
+
+    if (platform === 'youtube' || platform === 'instagram' || platform === 'tiktok' || niche.includes('music')) {
+      insights.push('🎵 A lot of artists grow by pushing the strongest hook or chorus first, not the whole song.');
+      insights.push('🔥 Many songs and creators get attention on short-form video before streaming numbers jump.');
+      insights.push('📅 Consistent content around each release usually matters more than one big promo post.');
+    }
+
+    insights.push('💡 The biggest creators usually repeat what works instead of always chasing something brand new.');
+    insights.push('🚀 Growth usually comes from consistency, recognizable style, and clear audience targeting.');
+
+    return insights;
+  }
+
+  function showResults() {
+    if (!results) return;
+
+    const store = JSON.parse(localStorage.getItem('mb_manual_stats') || '{}');
+    const byPlatform = store.byPlatform || {};
+
+    const signals = [];
+    const moves = [];
+    const plan = [];
+    const proBlocks = [];
+
+    Object.keys(byPlatform).forEach((platform) => {
+      const history = Array.isArray(byPlatform[platform]) ? byPlatform[platform] : [];
+      if (!history.length) return;
+
+      const latest = history[history.length - 1];
+      const prev = history.length > 1 ? history[history.length - 2] : null;
+
+      const followers = Number(latest.followers || 0);
+      const posts = Number(latest.posts || 0);
+      const likes = Number(latest.likes || 0);
+      const comments = Number(latest.comments || 0);
+      const shares = Number(latest.shares || 0);
+      const views = Number(latest.views || 0);
+
+      const engagement = followers
+        ? ((likes + comments + shares) / followers) * 100
+        : 0;
+
+      if (platform === 'youtube' && views > 0) {
+        signals.push(`${prettyName(platform)}: total tracked views ${views.toLocaleString()}.`);
+      }
+
+      if (engagement >= 8) {
+        signals.push(`${prettyName(platform)}: viral-level engagement (${engagement.toFixed(1)}%).`);
+      } else if (engagement >= 4) {
+        signals.push(`${prettyName(platform)}: strong engagement (${engagement.toFixed(1)}%).`);
+      } else if (followers > 0) {
+        signals.push(`${prettyName(platform)}: lower engagement (${engagement.toFixed(1)}%) — improve hooks.`);
+      }
+
+      if (shares > 0 && likes > 0 && shares >= likes * 0.2) {
+        signals.push(`${prettyName(platform)}: content is getting shared well.`);
+      }
+
+      if (comments >= 10) {
+        signals.push(`${prettyName(platform)}: audience conversation is improving.`);
+      }
+
+      if (prev) {
+        const growth = followers - Number(prev.followers || 0);
+        const prevFollowers = Number(prev.followers || 0);
+        const growthPct = prevFollowers > 0 ? ((growth / prevFollowers) * 100) : 0;
+
+        if (growth > 0) {
+          signals.push(`${prettyName(platform)}: up ${growth} followers vs last entry (${growthPct.toFixed(1)}%).`);
+        } else if (growth < 0) {
+          signals.push(`${prettyName(platform)}: down ${Math.abs(growth)} followers vs last entry.`);
+        } else if (followers > 0) {
+          signals.push(`${prettyName(platform)}: follower growth is flat this week.`);
+        }
+      }
+
+      if (posts < 3) {
+        moves.push(`${prettyName(platform)}: increase posting to 3–5 times this week.`);
+      } else if (posts > 0) {
+        moves.push(`${prettyName(platform)}: keep your posting consistency going.`);
+      }
+
+      if (comments < 5 && followers > 0) {
+        moves.push(`${prettyName(platform)}: ask stronger questions to pull more comments.`);
+      }
+
+      if (shares < 5 && followers > 0) {
+        moves.push(`${prettyName(platform)}: make more saveable/shareable posts.`);
+      }
+
+      if (platform === 'youtube' && views > 0 && followers === 0) {
+        moves.push(`${prettyName(platform)}: add subscriber/follower stats too so Mikey can give better YouTube advice.`);
+      }
+
+      if (platform === 'youtube' && views > 0) {
+        moves.push(`${prettyName(platform)}: turn your strongest moments into Shorts to push more watch time.`);
+      }
+
+      if ((latest.niche || '').toLowerCase().includes('music')) {
+        moves.push(`${prettyName(platform)}: push more short-form music clips and performance snippets.`);
+      }
+
+      if (platform === 'instagram') {
+        plan.push('Instagram: 3 Reels, 1 carousel, and 1 story CTA this week.');
+      } else if (platform === 'tiktok') {
+        plan.push('TikTok: 4 short videos with stronger first 2-second hooks.');
+      } else if (platform === 'youtube') {
+        plan.push('YouTube: 1 long-form post and 2 Shorts from your best moments.');
+      } else if (platform === 'facebook') {
+        plan.push('Facebook: 3 community posts and 1 conversation starter.');
+      } else if (platform === 'twitter') {
+        plan.push('X / Twitter: post daily short takes and 1 thread this week.');
+      } else if (platform === 'spotify') {
+        plan.push('Spotify: promote your strongest clip on social 3–4 times this week.');
+      } else if (platform === 'soundcloud') {
+        plan.push('SoundCloud: upload consistently and push repost/comment activity this week.');
+      } else {
+        plan.push(`${prettyName(platform)}: post consistently and review growth after the next save.`);
+      }
+
+      const proInsights = generateProInsights(platform, latest);
+      proBlocks.push(`
+        <div style="margin-bottom:12px">
+          <div style="font-weight:800;margin-bottom:6px">${prettyName(platform)}</div>
+          ${proInsights.map(i => `<div style="margin:4px 0">• ${i}</div>`).join('')}
+        </div>
+      `);
+    });
+
+    if (!signals.length) {
+      signals.push('No stats yet — connect a platform and save weekly numbers to unlock real insights.');
+    }
+
+    if (!moves.length) {
+      moves.push('Start with one platform, save your numbers, and Mikey will build your strategy from there.');
+    }
+
+    if (!plan.length) {
+      plan.push('Save your first weekly stats to generate your weekly plan.');
+    }
+
+    if (signalsList) signalsList.innerHTML = signals.map(x => `<li>${x}</li>`).join('');
+    if (movesList) movesList.innerHTML = moves.map(x => `<li>${x}</li>`).join('');
+    if (planBox) planBox.textContent = plan.join('\n');
+
+    if (proInsightsBox) {
+      proInsightsBox.innerHTML = proBlocks.length
+        ? proBlocks.join('')
+        : `<div class="muted">Save stats first to unlock top creator strategies.</div>`;
+    }
+
+    results.classList.remove('hidden');
+    renderStreamSignals();
+    window.mbRenderManualAdvice?.();
+  }
+
+  start?.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (!agree?.checked) {
+      alert('Please agree first.');
+      return;
+    }
+    if (!anySel()) {
+      alert('Pick a platform.');
+      return;
+    }
+
+    openModal(modal);
+    talk(true);
+
+    setTimeout(async () => {
+      closeModal(modal);
+      talk(false);
+      showResults();
+      await enhanceMikeyResultsWithAI();
+    }, 1100);
+  });
+})();
+
+
+  /* =========================
+     PROVIDER MAP
+  ========================== */
+  const mapProvider = (rawKey) => {
+    const k = String(rawKey || '').trim().toLowerCase();
+
+    if (k === 'instagram') return {
+      kind: 'social',
+      key: 'instagram',
+      profileKey: 'ig',
+      label: 'Instagram',
+      placeholder: 'https://instagram.com/yourname or @yourname'
+    };
+
+    if (k === 'youtube') return {
+      kind: 'social',
+      key: 'youtube',
+      profileKey: 'yt',
+      label: 'YouTube',
+      placeholder: 'https://youtube.com/@yourchannel or @yourchannel'
+    };
+
+    if (k === 'tiktok') return {
+      kind: 'social',
+      key: 'tiktok',
+      profileKey: 'tt',
+      label: 'TikTok',
+      placeholder: 'https://tiktok.com/@yourname or @yourname'
+    };
+
+    if (k === 'facebook') return {
+      kind: 'social',
+      key: 'facebook',
+      profileKey: 'fb',
+      label: 'Facebook',
+      placeholder: 'https://facebook.com/yourpage'
+    };
+
+    if (k === 'twitter' || k === 'x' || k.includes('twitter')) return {
+      kind: 'social',
+      key: 'twitter',
+      profileKey: 'tw',
+      label: 'X / Twitter',
+      placeholder: 'https://x.com/yourname or @yourname'
+    };
+
+    if (k === 'spotify') return {
+      kind: 'stream',
+      key: 'spotify',
+      profileKey: 'spotify',
+      label: 'Spotify',
+      placeholder: 'Spotify artist link'
+    };
+
+    if (k === 'soundcloud') return {
+      kind: 'stream',
+      key: 'soundcloud',
+      profileKey: 'soundcloud',
+      label: 'SoundCloud',
+      placeholder: 'https://soundcloud.com/yourname'
+    };
+
+    if (k === 'apple music' || k === 'apple') return {
+      kind: 'stream',
+      key: 'apple',
+      profileKey: 'apple',
+      label: 'Apple Music',
+      placeholder: 'Apple Music artist link'
+    };
+
+    if (k === 'ytmusic' || k === 'yt music' || k === 'youtube music') return {
+      kind: 'stream',
+      key: 'ytmusic',
+      profileKey: 'ytmusic',
+      label: 'YouTube Music',
+      placeholder: 'YouTube Music artist link'
+    };
+
+    return null;
+  };
+
+  /* =========================
+     STORAGE HELPERS
+  ========================== */
+  function loadManualStatsStore() {
+    return loadJSON('mb_manual_stats', { byPlatform: {} });
+  }
+
+  function saveManualStatsStore(store) {
+    saveJSON('mb_manual_stats', store);
+  }
+
+  function saveWeeklyStats(platform, data) {
+    const store = loadManualStatsStore();
+    store.byPlatform = store.byPlatform || {};
+    store.byPlatform[platform] = store.byPlatform[platform] || [];
+
+    store.byPlatform[platform].push({
+      ...data,
+      date: new Date().toISOString()
+    });
+
+    saveManualStatsStore(store);
+  }
+
+  function getPlatformHistory(platform) {
+    const store = loadManualStatsStore();
+    return store.byPlatform?.[platform] || [];
+  }
+
+  function getLastTwoWeeks(platform) {
+    const all = getPlatformHistory(platform);
+    if (all.length < 2) return null;
+
+    const last = all[all.length - 1];
+    const prev = all[all.length - 2];
+
+    return { last, prev };
+  }
+
+  function getLatestStats(platform) {
+    const all = getPlatformHistory(platform);
+    if (!all.length) return null;
+    return all[all.length - 1];
+  }
+
+  function getPreviousStats(platform) {
+    const all = getPlatformHistory(platform);
+    if (all.length < 2) return null;
+    return all[all.length - 2];
+  }
+
+  function calculateGrowthPercent(current, previous) {
+    const prev = Number(previous || 0);
+    const curr = Number(current || 0);
+    if (prev <= 0) return curr > 0 ? 100 : 0;
+    return ((curr - prev) / prev) * 100;
+  }
+
+  function calculateCreatorScore(stats) {
+    const followers = Number(stats.followers || 0);
+    const posts = Number(stats.posts || 0);
+    const likes = Number(stats.likes || 0);
+    const comments = Number(stats.comments || 0);
+    const shares = Number(stats.shares || 0);
+
+    const engagement = followers ? ((likes + comments + shares) / followers) * 100 : 0;
+
+    let score = 0;
+
+    if (posts >= 5) score += 3;
+    else if (posts >= 3) score += 2;
+    else if (posts >= 1) score += 1;
+
+    if (engagement >= 8) score += 4;
+    else if (engagement >= 4) score += 3;
+    else if (engagement >= 2) score += 2;
+    else if (engagement > 0) score += 1;
+
+    if (followers >= 10000) score += 3;
+    else if (followers >= 1000) score += 2;
+    else if (followers > 0) score += 1;
+
+    return Math.min(10, score);
+  }
+
+  function generateSmartAdvice(platform, stats) {
+    const advice = [];
+
+    const followers = Number(stats.followers || 0);
+    const posts = Number(stats.posts || 0);
+    const likes = Number(stats.likes || 0);
+    const comments = Number(stats.comments || 0);
+    const shares = Number(stats.shares || 0);
+
+    const engagement = followers ? ((likes + comments + shares) / followers) * 100 : 0;
+    const score = calculateCreatorScore(stats);
+
+    advice.push(`⭐ Creator score: ${score.toFixed(1)}/10`);
+
+    if (engagement > 8) {
+      advice.push("🔥 You’re hitting viral-level engagement. Double down on this content style.");
+    } else if (engagement > 4) {
+      advice.push("👍 Strong engagement. You’re on the right track — increase consistency.");
+    } else {
+      advice.push("⚠️ Low engagement. Focus on stronger hooks and more shareable content.");
+    }
+
+    if (posts < 3) {
+      advice.push("📉 You’re not posting enough. Aim for at least 3–5 posts per week.");
+    } else {
+      advice.push("📈 Good posting consistency — keep it up.");
+    }
+
+    if (stats.niche && stats.niche.toLowerCase().includes("music")) {
+      advice.push("🎵 Use short-form video (Reels/TikTok/Shorts) to promote your music.");
+    }
+
+    const weeks = getLastTwoWeeks(platform);
+    if (weeks) {
+      const growth = followers - Number(weeks.prev.followers || 0);
+      const growthPct = calculateGrowthPercent(followers, weeks.prev.followers);
+
+      if (growth > 0) {
+        advice.push(`🚀 You gained ${growth} followers this week (${growthPct.toFixed(1)}%). Keep pushing this strategy.`);
+      } else if (growth < 0) {
+        advice.push(`⚠️ You lost ${Math.abs(growth)} followers this week (${growthPct.toFixed(1)}%). Try adjusting your content style.`);
+      } else {
+        advice.push("➡️ No growth this week. Time to test new content ideas.");
+      }
+
+      const likeDelta = likes - Number(weeks.prev.likes || 0);
+      const commentDelta = comments - Number(weeks.prev.comments || 0);
+      const shareDelta = shares - Number(weeks.prev.shares || 0);
+
+      if (shareDelta > 0) {
+        advice.push(`📊 Shares are up by ${shareDelta}. Your content is becoming more spreadable.`);
+      }
+
+      if (likeDelta > 0 && growth <= 0) {
+        advice.push("🧠 Likes are rising but followers are not. Add stronger follow CTAs.");
+      }
+
+      if (commentDelta > 0) {
+        advice.push(`💬 Comments improved by ${commentDelta}. Keep making conversation-based posts.`);
+      }
+    }
+
+    if (platform === 'instagram') {
+      advice.push("📱 Instagram: prioritize Reels, strong cover text, and pinned posts.");
+    }
+    if (platform === 'tiktok') {
+      advice.push("🎬 TikTok: hook viewers in the first 1–2 seconds and use on-screen text.");
+    }
+    if (platform === 'youtube') {
+      advice.push("▶️ YouTube: improve titles/thumbnails and turn top clips into Shorts.");
+    }
+    if (platform === 'facebook') {
+      advice.push("📘 Facebook: ask more direct questions and use shareable community posts.");
+    }
+    if (platform === 'twitter') {
+      advice.push("🧵 X / Twitter: post short takes daily and test 1–2 threads each week.");
+    }
+
+    return advice;
+  }
+
+  function renderManualAdviceIntoMikey() {
+    const box = document.getElementById('manualAdviceBox');
+    if (!box) return;
+
+    const store = loadManualStatsStore();
+    const byPlatform = store.byPlatform || {};
+    const platformKeys = Object.keys(byPlatform);
+
+    if (!platformKeys.length) {
+      box.innerHTML = `<div class="muted">No manual weekly stats saved yet. Connect a platform and enter stats.</div>`;
+      return;
+    }
+
+    const prettyName = (k) => ({
+      instagram: 'Instagram',
+      youtube: 'YouTube',
+      tiktok: 'TikTok',
+      facebook: 'Facebook',
+      twitter: 'X / Twitter'
+    }[k] || k);
+
+    const chunks = [];
+
+    platformKeys.forEach((platform) => {
+      const latest = getLatestStats(platform);
+      if (!latest) return;
+
+      const previous = getPreviousStats(platform);
+      const engagement = Number(latest.followers || 0)
+        ? ((Number(latest.likes || 0) + Number(latest.comments || 0) + Number(latest.shares || 0)) / Number(latest.followers || 0)) * 100
+        : 0;
+
+      const score = calculateCreatorScore(latest);
+      const growthPct = previous ? calculateGrowthPercent(latest.followers, previous.followers) : null;
+      const advice = generateSmartAdvice(platform, latest);
+
+      chunks.push(`
+        <div style="border:1px solid var(--border);border-radius:14px;padding:12px;margin:12px 0">
+          <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
+            <div style="font-weight:800;font-size:15px">${prettyName(platform)}</div>
+            <div class="tiny muted">${latest.date ? new Date(latest.date).toLocaleDateString() : ''}</div>
+          </div>
+
+          <div class="tiny muted" style="margin:8px 0 10px">
+            Followers: ${Number(latest.followers || 0).toLocaleString()}
+            • Posts: ${Number(latest.posts || 0)}
+            • Avg likes: ${Number(latest.likes || 0).toLocaleString()}
+            • Avg comments: ${Number(latest.comments || 0).toLocaleString()}
+            • Avg shares: ${Number(latest.shares || 0).toLocaleString()}
+            • Engagement: ${engagement.toFixed(2)}%
+            • Score: ${score.toFixed(1)}/10
+            ${growthPct !== null ? ` • Follower growth: ${growthPct >= 0 ? '+' : ''}${growthPct.toFixed(1)}%` : ''}
+          </div>
+
+          <div>
+            ${advice.map(line => `<div style="margin:6px 0">• ${line}</div>`).join('')}
+          </div>
+        </div>
+      `);
+    });
+
+    box.innerHTML = chunks.join('');
+  }
+
+  window.mbRenderManualAdvice = renderManualAdviceIntoMikey;
+
+  /* =========================
+     MANUAL STATS MODAL
+  ========================== */
+  let currentPlatform = null;
+  let currentMapped = null;
+
+  function openManualStatsFor(platformKey, mapped = null) {
+    if (!manualModal) return;
+
+    currentPlatform = platformKey;
+    currentMapped = mapped;
+
+    const latest = getLatestStats(platformKey) || {};
+
+    if (msTitle) msTitle.textContent = `Weekly Stats — ${(mapped?.label || platformKey).toString()}`;
+    if (msDesc) msDesc.textContent = `Enter this week’s numbers for ${(mapped?.label || platformKey)}. Mikey will compare this week vs last week.`;
+    if (msStatus) msStatus.textContent = '';
+
+    if (msFollowers) msFollowers.value = latest.followers ?? '';
+    if (msPosts) msPosts.value = latest.posts ?? '';
+    if (msLikes) msLikes.value = latest.likes ?? '';
+    if (msComments) msComments.value = latest.comments ?? '';
+    if (msShares) msShares.value = latest.shares ?? '';
+    if (msNiche) msNiche.value = latest.niche ?? '';
+
+    openModal(manualModal);
+    setTimeout(() => msFollowers?.focus(), 60);
+  }
+
+  window.mbOpenManualStatsFor = openManualStatsFor;
+
+  msCancel?.addEventListener('click', () => closeModal(manualModal));
+
+  msSave?.addEventListener('click', () => {
+    if (!currentPlatform) return;
+
+    const stats = {
+      followers: Number(msFollowers?.value || 0),
+      posts: Number(msPosts?.value || 0),
+      likes: Number(msLikes?.value || 0),
+      comments: Number(msComments?.value || 0),
+      shares: Number(msShares?.value || 0),
+      niche: String(msNiche?.value || '').trim()
+    };
+
+    saveWeeklyStats(currentPlatform, stats);
+
+    const advice = generateSmartAdvice(currentPlatform, stats);
+    const box = document.getElementById('manualAdviceBox');
+    if (box) {
+      box.innerHTML = advice.map(a => `<div>• ${a}</div>`).join('');
+    }
+
+    if (msStatus) msStatus.textContent = '✅ Weekly stats saved.';
+    setTimeout(() => {
+      closeModal(manualModal);
+      window.mbRenderManualAdvice?.();
+    }, 350);
+  });
+
+  /* =========================
+     CONNECT MODAL
+  ========================== */
+  let current = null;
+
+  function openConnect(providerKey) {
+    const mapped = mapProvider(providerKey);
+    if (!mapped) return;
+
+    current = mapped;
+
+    if (connectTitleEl) connectTitleEl.textContent = `Connect ${mapped.label}`;
+    if (connectDescEl) connectDescEl.textContent = `Paste your ${mapped.label} profile link or @handle.`;
+    if (connectInputEl) {
+      connectInputEl.value = '';
+      connectInputEl.placeholder = mapped.placeholder || 'Paste link or @handle';
+    }
+    if (connectHintEl) connectHintEl.textContent = 'Tip: you can paste a full URL or just @name';
+
+    const p = normalizeProfile(loadProfile());
+    if (mapped.kind === 'social') {
+      connectInputEl.value = p.socials?.[mapped.profileKey] || '';
+    } else {
+      connectInputEl.value = p.streamUrls?.[mapped.profileKey] || '';
+    }
+
+    openModal(connectModal);
+    setTimeout(() => connectInputEl?.focus(), 60);
+  }
+
+  connectCancelBtn?.addEventListener('click', () => closeModal(connectModal));
+
+  connectSaveBtn?.addEventListener('click', () => {
+    if (!current) return;
+
+    const val = (connectInputEl?.value || '').trim();
+    if (!val) {
+      alert('Please paste a link or @handle.');
+      connectInputEl?.focus();
+      return;
+    }
+
+    const p = normalizeProfile(loadProfile());
+
+    if (current.kind === 'social') {
+      p.socials[current.profileKey] = val;
+      p.socialConnected[current.profileKey] = true;
+    } else {
+      p.streamUrls[current.profileKey] = val;
+      p.streaming[current.profileKey] = true;
+    }
+
+    saveProfile(p);
+
+    enrichPlatformFromAPI(current.key, val).then((apiStats) => {
+      if (!connectHintEl) return;
+      if (apiStats) {
+        connectHintEl.textContent = `${current.label} stats loaded into Weekly Stats.`;
+      } else {
+        connectHintEl.textContent = `${current.label} connected. Add weekly stats anytime if public stats are limited.`;
+      }
+    });
+
+    document.querySelectorAll('#ai .providers .prov[data-p]').forEach((btn) => {
+      const raw = btn.dataset.p || btn.getAttribute('data-p') || btn.textContent;
+      const mapped = mapProvider(raw);
+      if (!mapped) return;
+
+      const isOn = mapped.kind === 'social'
+        ? !!p.socialConnected[mapped.profileKey]
+        : !!p.streaming[mapped.profileKey];
+
+      btn.classList.toggle('active', isOn);
+    });
+
+    if (typeof refreshProfileConnectionUI === 'function') {
+      refreshProfileConnectionUI(p);
+    }
+
+    window.mbRenderProfileViews?.();
+    closeModal(connectModal);
+
+    if (current.kind === 'social' && manualModal) {
+      setTimeout(() => {
+        openManualStatsFor(current.key, current);
+      }, 120);
+    }
+
+    window.mbRenderManualAdvice?.();
+    window.mbSyncAnalyzeButton?.();
+  });
+
+  /* =========================
+     PROVIDER CLICK HANDLER
+  ========================== */
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('#connectModal')) return;
+
+    const btn = e.target.closest('.prov[data-p]');
+    if (!btn) return;
+
+    const insideAI  = btn.closest('#ai .providers');
+    const insideLib = btn.closest('#library .lib-providers');
+    if (!insideAI && !insideLib) return;
+
+    const providerKeyRaw = btn.dataset.p || btn.getAttribute('data-p') || btn.textContent;
+    const providerKey = String(providerKeyRaw || '').trim().toLowerCase();
+
+    if (providerKey === 'youtube') return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    openConnect(providerKeyRaw);
+  }, true);
+
+  renderManualAdviceIntoMikey();
+})();
+
+  /* =====================================================================
+     4) Directory + View Modal
+  ====================================================================== */
+  (function(){
+    const DIR=[
+      {id:'u1',name:'Lana Vox',handle:'@lanavox',role:'singer',  city:'Atlanta',skills:['r&b','hooks'],       online:true,  about:'R&B vocalist.', links:{instagram:'#',youtube:'#'}, share:{approved:false}},
+      {id:'u2',name:'808 Saint',handle:'@808saint',role:'producer',city:'Detroit',skills:['trap','808'],      online:false, about:'Trap packs.',    links:{instagram:'#'},           share:{approved:false}},
+      {id:'u3',name:'Key Writr',handle:'@keywrites',role:'writer', city:'LA',     skills:['toplines','afrobeats'],online:true, about:'Toplines 24h.',links:{instagram:'#',tiktok:'#'}, share:{approved:true}},
+      {id:'u4',name:'Milly Motion',handle:'@millymoves',role:'dancer', city:'Chicago',skills:['choreo','tiktok'], online:true,  about:'Choreo/promo.',links:{}, share:{approved:false}},
+      {id:'u5',name:'Fader Fox',handle:'@faderfox',role:'engineer',city:'Remote', skills:['mix','master'],     online:false, about:'Hybrid chain.',  links:{}, share:{approved:false}},
+      {id:'u6',name:'DJ Nova',handle:'@djnova',role:'dj', city:'Miami',skills:['club','latin'],                 online:true,  about:'Remote sets.',   links:{youtube:'#'}, share:{approved:false}},
+      {id:'u7',name:'Vision Shot',handle:'@visionshot',role:'video', city:'Remote',skills:['reels','video'],    online:false, about:'Vertical packs.',links:{}, share:{approved:false}},
+      {id:'u8',name:'Kay Manage',handle:'@kaymanage',role:'manager', city:'NYC',  skills:['dev','booking'],     online:true,  about:'1–2 serious acts.',links:{}, share:{approved:false}}
+    ];
+
+    const grid=$('#dirGrid'), empty=$('#dirEmpty'), search=$('#dirSearch'), filters=$$('.dir-filter');
+
+    const modal=$('#dirProfileModal');
+    const mAvatar=$('#dirProfAvatar'), mTitle=$('#dirProfileTitle'), mRole=$('#dirProfileRole');
+    const mBio=$('#dirProfileBio'), mHandle=$('#dirProfileHandle'), mBadge=$('#dirOnlineBadge'), mChat=$('#dirChatBtn');
+
+    const accessStatus=$('#dirAccessStatus'), accessBtn=$('#dirRequestBtn'), pendingLbl=$('#dirPendingLabel');
+
+    const liveWrap=$('#dirLiveBlock'), liveNone=$('#liveNone');
+    const pillSp=$('#liveSpotify'), pillAm=$('#liveApple'), pillSc=$('#liveSoundCloud'), pillYt=$('#liveYtMusic');
+    const nowLine=$('#dirNowPlaying');
+
+    function loadAccess(){ return loadJSON('mb_access', {}); }
+    function saveAccess(s){ saveJSON('mb_access', s); }
+    function getAccess(userId){ return (loadAccess()[userId] || {state:'locked'}).state; }
+    function setAccess(userId,state){ const s=loadAccess(); s[userId]={state,ts:Date.now()}; saveAccess(s); }
+
+    let state={role:'all',search:'',data:DIR,current:null};
+
+    function renderList(list){
+      if(!grid) return;
+      grid.innerHTML='';
+      if(!list.length){
+        empty?.classList.remove('hidden');
+        return;
+      }
+      empty?.classList.add('hidden');
+
+      list.forEach(u=>{
+        const el=document.createElement('article');
+        el.className='op-card';
+        el.dataset.id=u.id;
+        el.innerHTML=`
+          <div class="op-top">
+            <div class="avatar">${(u.name||'MB').slice(0,2).toUpperCase()}</div>
+            <div class="op-meta">
+              <div class="op-title">${u.name}</div>
+              <div class="op-sub">${u.role} • ${u.city||'Remote'}</div>
+            </div>
+          </div>
+          <div class="op-tags">
+            <span class="tag" style="${u.online?'background:#ecfdf3;border:1px solid #bbf7d0;color:#166534':''}">${u.online?'● Online':'○ Offline'}</span>
+            ${(u.skills||[]).map(s=>`<span class="tag">${s}</span>`).join('')}
+          </div>
+          <div class="op-body">${u.about||''}</div>
+          <div class="op-bottom">
+            <div></div>
+            <div class="op-actions">
+              <button class="btn outline small" data-action="view" type="button">View</button>
+              <button class="btn primary small" data-action="chat" ${u.online?'':'disabled style="opacity:.5"'} type="button">Chat</button>
+            </div>
+          </div>`;
+        el.querySelector('[data-action="view"]')?.addEventListener('click',()=>openUser(u));
+        el.querySelector('[data-action="chat"]')?.addEventListener('click',()=>alert('Demo chat'));
+        grid.appendChild(el);
+      });
+    }
+
+    function filterList(){
+      const q=(state.search||'').toLowerCase();
+      return state.data.filter(u=>{
+        const roleOk=state.role==='all'||u.role===state.role;
+        if(!roleOk) return false;
+        if(!q) return true;
+        const hay=[u.name,u.handle,u.city,u.role,(u.skills||[]).join(' ')].join(' ').toLowerCase();
+        return hay.includes(q);
+      });
+    }
+
+    search?.addEventListener('input',()=>{
+      state.search=search.value;
+      renderList(filterList());
+    });
+
+    filters.forEach(f=>f.addEventListener('click',()=>{
+      filters.forEach(x=>x.classList.remove('active'));
+      f.classList.add('active');
+      state.role=f.dataset.role||'all';
+      renderList(filterList());
+    }));
+
+    function renderLive(u,approved){
+      if(!liveWrap) return;
+      const pills=[['spotify',pillSp],['apple',pillAm],['soundcloud',pillSc],['ytmusic',pillYt]];
+      pills.forEach(([_,p])=>{
+        hide(p);
+        if(p){
+          p.onclick=null;
+          p.style.cursor='default';
+          p.innerHTML='';
+        }
+      });
+      show(liveNone);
+      txt(nowLine,'');
+
+      const st=LIVE_BY_USER[u.id]||{};
+      let any=false;
+      const now=[];
+      pills.forEach(([key,pill])=>{
+        if(!pill) return;
+        const row=st[key]||{};
+        const meta=PLATFORM_META[key];
+        if(row.live && meta){
+          any=true;
+
+          const chip = document.createElement(row.url ? 'a' : 'span');
+          chip.className = 'live-chip';
+          if (row.url){
+            chip.href=row.url;
+            chip.target='_blank';
+            chip.rel='noopener';
+          } else {
+            chip.setAttribute('aria-disabled','true');
+          }
+
+          const dot = document.createElement('span');
+          dot.className = 'live-dot';
+          dot.setAttribute('aria-hidden','true');
+
+          const img = document.createElement('img');
+          img.className = 'live-logo';
+          img.src = meta.logo;
+          img.alt = `${meta.label} logo`;
+          img.onerror = () => { img.style.display = 'none'; };
+
+          const name = document.createElement('span');
+          name.className = 'live-name';
+          name.textContent = meta.label + (approved && row.listeners ? ` • ${row.listeners}` : '');
+
+          chip.appendChild(dot);
+          chip.appendChild(img);
+          chip.appendChild(name);
+
+          pill.className = 'tag live-pill';
+          pill.innerHTML = '';
+          pill.appendChild(chip);
+          show(pill);
+
+          if (approved && row.nowPlaying){
+            now.push(`${meta.label}: “${row.nowPlaying}”`);
+          }
+        }
+      });
+
+      if(any) hide(liveNone);
+      if(approved) txt(nowLine,now.join(' • '));
+      else txt(nowLine, any ? 'Live platforms & links are public. Titles & counts require access.' : '');
+    }
+
+    function renderAccessUI(u){
+      const local=getAccess(u.id);
+      const preset=!!u.share?.approved;
+      const approved=preset || local==='approved';
+      const pending =!approved && local==='pending';
+
+      if(accessStatus){
+        accessStatus.textContent = approved
+          ? 'Approved — extra live details unlocked.'
+          : pending
+            ? 'Pending — waiting for approval. Live platforms remain public.'
+            : 'Locked — request required. Live platforms are public.';
+      }
+      if(accessBtn){
+        accessBtn.style.display=approved?'none':'';
+        accessBtn.disabled=pending;
+      }
+      if(pendingLbl){
+        pendingLbl.style.display=pending?'':'none';
+      }
+
+      renderLive(u,approved);
+    }
+
+    function openUser(u){
+      state.current=u;
+      txt(mAvatar,(u.name||'MB').slice(0,2).toUpperCase());
+      txt(mTitle,u.name);
+      txt(mRole,`${u.role}${u.city?' • '+u.city:''}`);
+      txt(mBio,u.about||'');
+      txt(mHandle,u.handle||'@creator');
+      txt(mBadge,u.online?'Online':'Offline');
+      if(mBadge){
+        mBadge.style.background=u.online?'#ecfdf3':'#f8fafc';
+        mBadge.style.borderColor=u.online?'#bbf7d0':'#e2e8f0';
+        mBadge.style.color=u.online?'#166534':'#475569';
+      }
+      if(mChat) mChat.disabled=!u.online;
+
+      renderAccessUI(u);
+      openModal(modal);
+    }
+
+    accessBtn?.addEventListener('click', ()=>{
+      if(!state.current) return;
+      setAccess(state.current.id,'pending');
+      renderAccessUI(state.current);
+    });
+
+    renderList(filterList());
+  })();
+
+  /* =====================================================================
+     5) Profile (localStorage) + Bio + Social connects + Library views card
+     ✅ FIXED: uses shared normalizer + shared storage
+  ====================================================================== */
+  (function () {
+    let p = normalizeProfile(loadProfile());
+
+    const el = (id) => document.getElementById(id);
+    const setCSS = (col) => document.documentElement.style.setProperty('--panel-bg', col || '#f8fafc');
+
+    const profileSection = document.getElementById('profile');
+    const heroSection = el('profHero');
+
+    const updHero = () => {
+      txt(el('profNameDisplay'), p.name || 'Your Name');
+      txt(el('profCityDisplay'), p.city || 'City');
+      txt(el('profInitials'), (p.name ? p.name.slice(0, 2) : 'MB').toUpperCase());
+
+      const hero = el('profHero');
+      if (hero) {
+        const a = p.color || '#1aa3ff';
+        hero.style.background =
+          p.theme === 'city'
+            ? `linear-gradient(120deg, ${a}, #0ea5e9)`
+            : p.theme === 'music'
+              ? `linear-gradient(120deg, ${a}, #9333ea)`
+              : '#f8fafc';
+      }
+    };
+
+    const applyTextColor = () => {
+      if (profileSection) profileSection.style.color = p.textColor || '#0f172a';
+      if (heroSection) heroSection.style.color = p.textColor || '#0f172a';
+    };
+
+    const applyBg = () => {
+      document.body.classList.remove('has-photo-bg');
+      document.body.style.backgroundImage = '';
+
+      const bg = p.bg || {};
+      if (bg.mode === 'none') return;
+
+      let url = '';
+      if (bg.mode === 'preset' && bg.preset) url = `images/backgrounds/${bg.preset}.jpg`;
+      if (bg.mode === 'image' && bg.image) url = bg.image;
+
+      if (url) {
+        document.body.style.backgroundImage = `url('${url}')`;
+        document.body.style.backgroundSize = 'cover';
+        document.body.style.backgroundRepeat = 'no-repeat';
+        document.body.style.backgroundPosition = 'center';
+        document.body.style.backgroundAttachment = 'fixed';
+        document.body.classList.add('has-photo-bg');
+      }
+    };
+
+    // initial paint
+    updHero();
+    setCSS(p.panelColor);
+    applyBg();
+    applyTextColor();
+
+    // Fill inputs
+    const setVal = (id, val) => { const n = el(id); if (n) n.value = val || ''; };
+    setVal('profName', p.name);
+    setVal('profCity', p.city);
+    setVal('profColor', p.color);
+    setVal('profPanelColor', p.panelColor);
+    setVal('profTextColor', p.textColor);
+    setVal('profBio', p.bio);
+
+    const mode = el('profBgMode');
+    if (mode) {
+      mode.value = p.bg?.mode || 'none';
+      el('bgUploadRow')?.classList.toggle('hidden', mode.value !== 'image');
+      el('bgPresets')?.classList.toggle('hidden', mode.value !== 'preset');
+    }
+
+    const prev = el('profPreview');
+    if (prev) {
+      if (p.pic) prev.src = p.pic;
+      else prev.removeAttribute('src');
+    }
+
+    // Render connection labels/buttons
+    function renderConnections() {
+      p = normalizeProfile(loadProfile());
+      refreshProfileConnectionUI(p);
+    }
+    renderConnections();
+
+    // BIO counter
+    const bioEl = el('profBio');
+    const bioCnt = el('bioCount');
+    const saveStatus = el('profSaveStatus');
+    const saveStatusInline = el('profSaveStatusInline');
+    const bioPreviewText = el('bioPreviewText');
+    const bioPreviewName = el('bioPreviewName');
+    const bioPreviewCity = el('bioPreviewCity');
+    let saveNoteTimer = null;
+
+    const setSaveNote = (msg, mode = 'idle') => {
+      [saveStatus, saveStatusInline].forEach((node) => {
+        if (!node) return;
+        node.textContent = msg;
+        node.classList.toggle('is-idle', mode === 'idle');
+      });
+    };
+
+    const renderBioPreview = () => {
+      if (bioPreviewName) bioPreviewName.textContent = (p.name || 'Your Artist Name').trim() || 'Your Artist Name';
+      if (bioPreviewCity) bioPreviewCity.textContent = (p.city || 'Your City').trim() || 'Your City';
+      if (bioPreviewText) {
+        const val = (p.bio || '').trim();
+        bioPreviewText.textContent = val || 'Your bio preview will show here as you type.';
+        bioPreviewText.classList.toggle('is-empty', !val);
+      }
+    };
+
+    const updateBioCount = () => {
+      if (!bioEl || !bioCnt) return;
+      bioCnt.textContent = (bioEl.value || '').length;
+    };
+    updateBioCount();
+    renderBioPreview();
+    setSaveNote('Changes save to your profile here', 'idle');
+
+    // Input events
+    el('profName')?.addEventListener('input', (e) => { p.name = e.target.value; updHero(); renderBioPreview(); setSaveNote('Unsaved profile changes', 'idle'); saveProfile(p); });
+    el('profCity')?.addEventListener('input', (e) => { p.city = e.target.value; updHero(); renderBioPreview(); setSaveNote('Unsaved profile changes', 'idle'); saveProfile(p); });
+    el('profColor')?.addEventListener('input', (e) => { p.color = e.target.value; updHero(); saveProfile(p); });
+
+    el('profPanelColor')?.addEventListener('input', (e) => {
+      p.panelColor = e.target.value || '#f8fafc';
+      setCSS(p.panelColor);
+      saveProfile(p);
+    });
+
+    el('profTextColor')?.addEventListener('input', (e) => {
+      p.textColor = e.target.value || '#0f172a';
+      applyTextColor();
+      saveProfile(p);
+    });
+
+    bioEl?.addEventListener('input', (e) => {
+      let val = e.target.value || '';
+      if (val.length > 2000) {
+        val = val.slice(0, 2000);
+        e.target.value = val;
+      }
+      p.bio = val;
+      updateBioCount();
+      renderBioPreview();
+      setSaveNote('Unsaved profile changes', 'idle');
+      saveProfile(p);
+    });
+
+    // Background mode + uploads
+    el('profBgMode')?.addEventListener('change', (e) => {
+      p.bg = p.bg || { mode: 'none' };
+      p.bg.mode = e.target.value;
+      if (p.bg.mode !== 'image') p.bg.image = '';
+      el('bgUploadRow')?.classList.toggle('hidden', p.bg.mode !== 'image');
+      el('bgPresets')?.classList.toggle('hidden', p.bg.mode !== 'preset');
+      applyBg();
+      saveProfile(p);
+    });
+
+    el('profBgImage')?.addEventListener('change', (e) => {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = () => {
+        p.bg.image = r.result;
+        p.bg.mode = 'image';
+        applyBg();
+        saveProfile(p);
+      };
+      r.readAsDataURL(f);
+    });
+
+    el('bgPresets')?.addEventListener('click', (e) => {
+      const b = e.target.closest('.bg-thumb');
+      if (!b) return;
+      p.bg.preset = b.dataset.bg;
+      p.bg.mode = 'preset';
+      applyBg();
+      saveProfile(p);
+    });
+
+    // Profile picture upload
+    el('profPic')?.addEventListener('change', (e) => {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = () => {
+        p.pic = r.result;
+        if (prev) prev.src = p.pic;
+        saveProfile(p);
+      };
+      r.readAsDataURL(f);
+    });
+
+    // Keep Mikey UI consistent (if Mikey exists on same page)
+    const setMikeyProviderActive = (providerKey, active) => {
+      const k = String(providerKey || '').trim().toLowerCase();
+      const btn = document.querySelector(`#ai .providers .prov[data-p="${k}"]`);
+      if (btn) btn.classList.toggle('active', !!active);
+    };
+
+    const disconnectOnly = (group, key, btnId, statusId, mikeyProviderKeyForUI) => {
+      el(btnId)?.addEventListener('click', () => {
+        p = normalizeProfile(loadProfile());
+        if (!p?.[group]?.[key]) return; // not connected
+
+        p[group][key] = false;
+
+        // also clear the saved handle / link so this is a full disconnect
+        const socialKeyMap = { ig: 'ig', yt: 'yt', tt: 'tt', tw: 'tw', fb: 'fb' };
+        const streamKeyMap = { spotify: 'spotify', apple: 'apple', soundcloud: 'soundcloud', ytmusic: 'ytmusic' };
+
+        if (group === 'socialConnected' && p.socials && socialKeyMap[key]) {
+          p.socials[socialKeyMap[key]] = '';
+        }
+        if (group === 'streaming' && p.streamUrls && streamKeyMap[key]) {
+          p.streamUrls[streamKeyMap[key]] = '';
+        }
+
+        saveProfile(p);
+
+        // update UI
+        setText(statusId, 'Not connected');
+        setDisconnectOnlyButton(btnId, false);
+
+        if (mikeyProviderKeyForUI) setMikeyProviderActive(mikeyProviderKeyForUI, false);
+
+        // keep other areas in sync without touching page navigation
+        refreshProfileConnectionUI(p);
+        window.mbRenderProfileViews?.();
+        window.mbRenderManualAdvice?.();
+      });
+    };
+
+    // Streaming disconnects
+    disconnectOnly('streaming', 'spotify',    'spToggle',  'spStatus',  'spotify');
+    disconnectOnly('streaming', 'apple',      'amToggle',  'amStatus',  'apple');
+    disconnectOnly('streaming', 'soundcloud', 'scToggle',  'scStatus',  'soundcloud');
+    disconnectOnly('streaming', 'ytmusic',    'ytmToggle', 'ytmStatus', 'ytmusic');
+
+    // Social disconnects
+    disconnectOnly('socialConnected', 'ig', 'igToggle', 'igStatus', 'instagram');
+    disconnectOnly('socialConnected', 'yt', 'ytToggle', 'ytStatus', 'youtube');
+    disconnectOnly('socialConnected', 'tt', 'ttToggle', 'ttStatus', 'tiktok');
+    disconnectOnly('socialConnected', 'tw', 'twToggle', 'twStatus', 'twitter');
+    disconnectOnly('socialConnected', 'fb', 'fbToggle', 'fbStatus', 'facebook');
+
+    // Save + Reset buttons
+    el('profSave')?.addEventListener('click', () => {
+      p = normalizeProfile(loadProfile());
+      p.name = (el('profName')?.value || '').trim();
+      p.city = (el('profCity')?.value || '').trim();
+      p.bio = (bioEl?.value || '').trim();
+      p.color = el('profColor')?.value || p.color;
+      p.panelColor = el('profPanelColor')?.value || p.panelColor;
+      p.textColor = el('profTextColor')?.value || p.textColor;
+      saveProfile(p);
+      updHero();
+      renderBioPreview();
+      setSaveNote('Profile saved successfully', 'saved');
+      const saveBtn = el('profSave');
+      if (saveBtn) {
+        const original = saveBtn.textContent;
+        saveBtn.textContent = 'Saved';
+        saveBtn.disabled = true;
+        clearTimeout(saveNoteTimer);
+        saveNoteTimer = setTimeout(() => {
+          saveBtn.textContent = original || 'Save Profile';
+          saveBtn.disabled = false;
+          setSaveNote('All profile changes are saved', 'saved');
+        }, 1200);
+      }
+    });
+
+    el('profReset')?.addEventListener('click', () => {
+      localStorage.removeItem('mb_profile');
+      location.reload();
+    });
+
+    // If Mikey auto-connects while Profile is open
+    document.addEventListener('mb:profile-updated', (e) => {
+      p = normalizeProfile(e.detail || loadProfile());
+      renderConnections();
+      renderBioPreview();
+    });
+  })();
+
+  /* =====================================================================
+     6) Library totals (user-consented) + notify Profile views
+  ====================================================================== */
+  (function(){
+    const consent=$('#libConsent'), connect=$('#libConnect'), card=$('#viewsCard'), total=$('#libTotalViews'), breakd=$('#viewsBreakdown'), refresh=$('#libRefresh');
+    const sync=()=>{ if(connect) connect.disabled=!consent?.checked; };
+    consent?.addEventListener('change',sync);
+    sync();
+
+    const load = () => loadViewsData();
+    const save = (v) => saveJSON('mb_views', v);
+    const fmt=n=>Number(n||0).toLocaleString();
+
+    const render=()=>{
+      const v=load();
+      if(v.total){
+        if(total) total.textContent=fmt(v.total);
+        if(breakd){
+          const pp=v.perPlatform||{};
+          breakd.textContent=Object.entries(pp)
+            .map(([k,val])=>
+              (
+                {youtube:'YouTube',shorts:'YouTube Shorts',tiktok:'TikTok',instagram:'Instagram',facebook:'Facebook'}[k]||k
+              )+': '+fmt(val)
+            )
+            .join(' • ');
+        }
+        if(card) card.style.display='block';
+      } else {
+        if(card) card.style.display='none';
+      }
+    };
+
+    connect?.addEventListener('click',()=>{
+      const per={youtube:128430,shorts:92115,tiktok:30499,instagram:15200,facebook:8800};
+      const totalN=Object.values(per).reduce((a,b)=>a+b,0);
+      save({total:totalN,perPlatform:per,ts:Date.now()});
+      render();
+      window.mbRenderProfileViews?.();
+    });
+
+    refresh?.addEventListener('click',render);
+    render();
+  })();
+
+  /* =====================================================================
+     7) Terms & Conditions Modal (SINGLE version — fixed)
+  ====================================================================== */
+  (function(){
+    const modal    = $('#mbTermsModal');
+    const checkBox = $('#mbTermsCheck');
+    const accept   = $('#mbTermsAccept');
+
+    if (!modal || !checkBox || !accept) return;
+
+    const alreadyAccepted = localStorage.getItem('mb_terms_accepted') === '1';
+    if (!alreadyAccepted) {
+      modal.classList.remove('hidden');
+      modal.setAttribute('aria-hidden', 'false');
+    }
+
+    accept.addEventListener('click', () => {
+      if (!checkBox.checked) {
+        alert('Please check the box to confirm you agree to the Terms.');
+        return;
+      }
+      localStorage.setItem('mb_terms_accepted', '1');
+      modal.classList.add('hidden');
+      modal.setAttribute('aria-hidden', 'true');
+    });
+  })();
+
+  /* =====================================================================
+     Profile Totals (shows SAME totals as Library) ✅ FIXED
+     - Reads localStorage key: mb_views
+     - Maps perPlatform -> chips
+     - Refreshes when you click Profile button OR tabs
+  ====================================================================== */
+  (function () {
+    function fmt(n) {
+      n = Number(n || 0);
+      return n.toLocaleString();
+    }
+
+    function getTotalsFromStorage() {
+      try {
+        const raw = localStorage.getItem("mb_views");
+        if (raw) return JSON.parse(raw);
+      } catch (e) {}
+      return null;
+    }
+
+    function normalizeTotals(data) {
+      if (!data) return null;
+
+      const platforms = data.perPlatform || data.platforms || data.breakdown || {};
+      const total = data.total ?? data.totalViews ?? Object.values(platforms).reduce((a,b)=>a+Number(b||0),0);
+
+      return { totalViews: Number(total || 0), platforms };
+    }
+
+    const prettyName = (k) => ({
+      youtube: 'YouTube',
+      shorts: 'YouTube Shorts',
+      tiktok: 'TikTok',
+      instagram: 'Instagram',
+      facebook: 'Facebook',
+      twitter: 'X / Twitter',
+      x: 'X / Twitter'
+    }[String(k||'').toLowerCase()] || k);
+
+    window.mbRenderProfileViews = function mbRenderProfileViews() {
+      const card = document.getElementById("profViewsCard");
+      const totalEl = document.getElementById("profViewsTotal");
+      const subEl = document.getElementById("profViewsSub");
+      const chipsEl = document.getElementById("profViewsChips");
+
+      if (!card || !totalEl || !subEl || !chipsEl) return;
+
+      const raw = getTotalsFromStorage();
+      const totals = normalizeTotals(raw);
+
+      if (!totals) {
+        card.style.display = "none";
+        return;
+      }
+
+      card.style.display = "block";
+      totalEl.textContent = fmt(totals.totalViews);
+
+      const activePlatforms = Object.entries(totals.platforms || {})
+        .filter(([, v]) => Number(v || 0) > 0);
+
+      subEl.textContent = activePlatforms.length
+        ? `${activePlatforms.length} connected source${activePlatforms.length === 1 ? "" : "s"}`
+        : `No platform totals yet`;
+
+      chipsEl.innerHTML = "";
+      activePlatforms.forEach(([name, val]) => {
+        const chip = document.createElement("span");
+        chip.className = "chip";
+        chip.style.cssText =
+          "border:1px solid rgba(255,255,255,.12);padding:6px 10px;border-radius:999px;font-size:12px;opacity:.95";
+        chip.textContent = `${prettyName(name)}: ${fmt(val)}`;
+        chipsEl.appendChild(chip);
+      });
+    };
+
+    window.mbRenderProfileViews();
+
+    document.addEventListener("click", (e) => {
+      const tabBtn = e.target.closest(".tab");
+      if (tabBtn && tabBtn.getAttribute("data-target") === "profile") {
+        window.mbRenderProfileViews?.();
+        refreshProfileConnectionUI(normalizeProfile(loadProfile()));
+      }
+
+      const profBtn = e.target.closest("#profileTabBtn");
+      if (profBtn) {
+        window.mbRenderProfileViews?.();
+        refreshProfileConnectionUI(normalizeProfile(loadProfile()));
+      }
+    });
+  })();
+
+</script>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const grid = document.getElementById('dirGrid');
+  const search = document.getElementById('dirSearch');
+  const empty = document.getElementById('dirEmpty');
+  const filters = [...document.querySelectorAll('.dir-filter')];
+  if (!grid) return;
+
+  const DEMO_DIR = [
+    {id:'u1',name:'Lana Vox',handle:'@lanavox',role:'singer',city:'Atlanta',skills:['r&b','hooks'],online:true,about:'R&B vocalist.'},
+    {id:'u2',name:'808 Saint',handle:'@808saint',role:'producer',city:'Detroit',skills:['trap','808'],online:false,about:'Trap packs.'},
+    {id:'u3',name:'Key Writr',handle:'@keywrites',role:'writer',city:'LA',skills:['toplines','afrobeats'],online:true,about:'Toplines 24h.'},
+    {id:'u4',name:'Milly Motion',handle:'@millymoves',role:'dancer',city:'Chicago',skills:['choreo','tiktok'],online:true,about:'Choreo/promo.'},
+    {id:'u5',name:'Fader Fox',handle:'@faderfox',role:'engineer',city:'Remote',skills:['mix','master'],online:false,about:'Hybrid chain.'},
+    {id:'u6',name:'DJ Nova',handle:'@djnova',role:'dj',city:'Miami',skills:['club','latin'],online:true,about:'Remote sets.'},
+    {id:'u7',name:'Vision Shot',handle:'@visionshot',role:'video',city:'Remote',skills:['reels','video'],online:false,about:'Vertical packs.'},
+    {id:'u8',name:'Kay Manage',handle:'@kaymanage',role:'manager',city:'NYC',skills:['dev','booking'],online:true,about:'1–2 serious acts.'}
+  ];
+
+  let role = 'all';
+  let query = '';
+
+  function cardHTML(u){
+    return `
+      <article class="dir-card" data-id="${u.id}">
+        <div class="avatar">${(u.name || 'MB').slice(0,2).toUpperCase()}</div>
+        <div class="dir-main">
+          <div class="dir-name">${u.name}</div>
+          <div class="dir-meta">${u.role} • ${u.city || 'Remote'} • ${u.handle || ''}</div>
+          <div class="dir-tags-row">
+            <span class="${u.online ? 'online-badge' : 'offline-badge'}">${u.online ? '● Online' : '○ Offline'}</span>
+            ${(u.skills || []).map(s => `<span class="tag">${s}</span>`).join('')}
+          </div>
+          <div class="tiny muted">${u.about || ''}</div>
+          <div class="dir-actions">
+            <button class="btn outline tiny" type="button" data-view="${u.id}">View</button>
+            <button class="btn primary tiny" type="button" ${u.online ? '' : 'disabled style="opacity:.5"'}>Chat</button>
+          </div>
+        </div>
+      </article>`;
+  }
+
+  function filtered(){
+    const q = query.trim().toLowerCase();
+    return DEMO_DIR.filter(u => {
+      if (role !== 'all' && u.role !== role) return false;
+      if (!q) return true;
+      const hay = [u.name, u.handle, u.role, u.city, ...(u.skills || []), u.about].join(' ').toLowerCase();
+      return hay.includes(q);
+    });
+  }
+
+  function render(){
+    const list = filtered();
+    grid.innerHTML = list.map(cardHTML).join('');
+    if (empty) empty.classList.toggle('hidden', !!list.length);
+  }
+
+  search?.addEventListener('input', (e) => {
+    query = e.target.value || '';
+    render();
+  });
+
+  filters.forEach(btn => btn.addEventListener('click', () => {
+    filters.forEach(x => x.classList.remove('active'));
+    btn.classList.add('active');
+    role = btn.dataset.role || 'all';
+    render();
+  }));
+
+  grid.addEventListener('click', (e) => {
+    const id = e.target.closest('[data-view]')?.getAttribute('data-view');
+    if (!id) return;
+    const u = DEMO_DIR.find(x => x.id === id);
+    if (!u) return;
+
+    const modal = document.getElementById('dirProfileModal');
+    const title = document.getElementById('dirProfileTitle');
+    const roleEl = document.getElementById('dirProfileRole');
+    const avatar = document.getElementById('dirProfAvatar');
+    const chatBtn = document.getElementById('dirChatBtn');
+    const access = document.getElementById('dirAccessStatus');
+    const none = document.getElementById('liveNone');
+    const now = document.getElementById('dirNowPlaying');
+    if (avatar) avatar.textContent = (u.name || 'MB').slice(0,2).toUpperCase();
+    if (title) title.textContent = u.name;
+    if (roleEl) roleEl.textContent = `${u.role} • ${u.city}`;
+    if (chatBtn) chatBtn.disabled = !u.online;
+    if (access) access.textContent = 'Locked — request required. Live platforms are public.';
+    if (none) none.hidden = false;
+    if (now) now.textContent = '';
+    if (modal) {
+      modal.classList.remove('hidden');
+      modal.setAttribute('aria-hidden', 'false');
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('#dirProfileModal [data-close]')) {
+      const modal = document.getElementById('dirProfileModal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.setAttribute('aria-hidden', 'true');
+      }
+    }
+  });
+
+  render();
+});
+</script>
+
+<!-- keep if you had it -->
+<script src="library.js"></script>
+
+
+
+
+
+
+
+
+
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const loadJSON = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key) || '') ?? fallback; } catch { return fallback; } };
+  const saveJSON = (key, val) => localStorage.setItem(key, JSON.stringify(val));
+
+  const normalizeProfile = (raw) => {
+    const base = {
+      socials: { ig: '', tw: '', yt: '', sc: '', tt: '', fb: '' },
+      streamUrls: { spotify:'', apple:'', soundcloud:'', ytmusic:'' },
+      streaming: { spotify: false, apple: false, soundcloud: false, ytmusic: false },
+      socialConnected: { ig: false, tw: false, yt: false, tt: false, fb: false }
+    };
+    const p = Object.assign({}, base, raw || {});
+    p.socials = Object.assign({}, base.socials, p.socials || {});
+    p.streamUrls = Object.assign({}, base.streamUrls, p.streamUrls || {});
+    p.streaming = Object.assign({}, base.streaming, p.streaming || {});
+    p.socialConnected = Object.assign({}, base.socialConnected, p.socialConnected || {});
+    return p;
+  };
+
+  const setDisconnectOnlyButton = (btnId, connected) => {
+    const b = document.getElementById(btnId);
+    if (!b) return;
+    b.textContent = connected ? 'Disconnect' : 'Connect via Mikey';
+    b.disabled = !connected;
+    b.setAttribute('aria-disabled', connected ? 'false' : 'true');
+    if (connected) {
+      b.style.background = '#16a34a';
+      b.style.borderColor = '#16a34a';
+      b.style.color = '#ffffff';
+      b.style.opacity = '1';
+      b.style.cursor = 'pointer';
+    } else {
+      b.style.background = '';
+      b.style.borderColor = '';
+      b.style.color = '';
+      b.style.opacity = '.55';
+      b.style.cursor = 'not-allowed';
+    }
+  };
+
+  const setText = (id, text) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+
+  const refreshProfileConnectionUI = (pRaw) => {
+    const p = normalizeProfile(pRaw);
+    setText('spStatus', p.streaming.spotify ? 'Connected' : 'Not connected');
+    setDisconnectOnlyButton('spToggle', p.streaming.spotify);
+    setText('amStatus', p.streaming.apple ? 'Connected' : 'Not connected');
+    setDisconnectOnlyButton('amToggle', p.streaming.apple);
+    setText('scStatus', p.streaming.soundcloud ? 'Connected' : 'Not connected');
+    setDisconnectOnlyButton('scToggle', p.streaming.soundcloud);
+    setText('ytmStatus', p.streaming.ytmusic ? 'Connected' : 'Not connected');
+    setDisconnectOnlyButton('ytmToggle', p.streaming.ytmusic);
+    setText('igStatus', p.socialConnected.ig ? 'Connected' : 'Not connected');
+    setDisconnectOnlyButton('igToggle', p.socialConnected.ig);
+    setText('ytStatus', p.socialConnected.yt ? 'Connected' : 'Not connected');
+    setDisconnectOnlyButton('ytToggle', p.socialConnected.yt);
+    setText('ttStatus', p.socialConnected.tt ? 'Connected' : 'Not connected');
+    setDisconnectOnlyButton('ttToggle', p.socialConnected.tt);
+    setText('twStatus', p.socialConnected.tw ? 'Connected' : 'Not connected');
+    setDisconnectOnlyButton('twToggle', p.socialConnected.tw);
+    setText('fbStatus', p.socialConnected.fb ? 'Connected' : 'Not connected');
+    setDisconnectOnlyButton('fbToggle', p.socialConnected.fb);
+  };
+
+  const disconnectMap = {
+    igToggle: { group: 'socialConnected', key: 'ig', clearGroup: 'socials', clearKey: 'ig', statusId: 'igStatus', aiProv: 'instagram' },
+    ytToggle: { group: 'socialConnected', key: 'yt', clearGroup: 'socials', clearKey: 'yt', statusId: 'ytStatus', aiProv: 'youtube' },
+    ttToggle: { group: 'socialConnected', key: 'tt', clearGroup: 'socials', clearKey: 'tt', statusId: 'ttStatus', aiProv: 'tiktok' },
+    twToggle: { group: 'socialConnected', key: 'tw', clearGroup: 'socials', clearKey: 'tw', statusId: 'twStatus', aiProv: 'twitter' },
+    fbToggle: { group: 'socialConnected', key: 'fb', clearGroup: 'socials', clearKey: 'fb', statusId: 'fbStatus', aiProv: 'facebook' },
+    spToggle: { group: 'streaming', key: 'spotify', clearGroup: 'streamUrls', clearKey: 'spotify', statusId: 'spStatus', aiProv: 'spotify' },
+    amToggle: { group: 'streaming', key: 'apple', clearGroup: 'streamUrls', clearKey: 'apple', statusId: 'amStatus', aiProv: 'apple music' },
+    scToggle: { group: 'streaming', key: 'soundcloud', clearGroup: 'streamUrls', clearKey: 'soundcloud', statusId: 'scStatus', aiProv: 'soundcloud' },
+    ytmToggle: { group: 'streaming', key: 'ytmusic', clearGroup: 'streamUrls', clearKey: 'ytmusic', statusId: 'ytmStatus', aiProv: 'ytmusic' }
+  };
+
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('#igToggle,#ytToggle,#ttToggle,#twToggle,#fbToggle,#spToggle,#amToggle,#scToggle,#ytmToggle');
+    if (!btn) return;
+    const cfg = disconnectMap[btn.id];
+    if (!cfg) return;
+
+    const profile = normalizeProfile(loadJSON('mb_profile', {}));
+    const isConnected = !!(profile[cfg.group] && profile[cfg.group][cfg.key]);
+    if (!isConnected) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation?.();
+
+    profile[cfg.group][cfg.key] = false;
+    if (profile[cfg.clearGroup]) profile[cfg.clearGroup][cfg.clearKey] = '';
+    saveJSON('mb_profile', profile);
+
+    setText(cfg.statusId, 'Not connected');
+    refreshProfileConnectionUI(profile);
+
+    const aiBtn = document.querySelector(`#ai .providers .prov[data-p="${cfg.aiProv}"]`)
+      || document.querySelector(`#library .lib-providers .prov[data-p="${cfg.aiProv}"]`);
+    if (aiBtn) aiBtn.classList.remove('active');
+
+    window.mbRenderProfileViews?.();
+    window.mbRenderManualAdvice?.();
+    document.dispatchEvent(new CustomEvent('mb:profile-updated', { detail: profile }));
+  }, true);
+
+  refreshProfileConnectionUI(loadJSON('mb_profile', {}));
+});
+</script>
+
+
+
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const prettyPlatform = (key) => ({
+    instagram: 'Instagram',
+    youtube: 'YouTube',
+    tiktok: 'TikTok',
+    facebook: 'Facebook',
+    twitter: 'X / Twitter',
+    spotify: 'Spotify',
+    soundcloud: 'SoundCloud',
+    apple: 'Apple Music',
+    ytmusic: 'YouTube Music'
+  }[String(key || '').toLowerCase()] || key);
+
+  const loadManualStats = () => {
+    try { return JSON.parse(localStorage.getItem('mb_manual_stats') || '{}'); }
+    catch { return {}; }
+  };
+
+  const latestPerPlatform = () => {
+    const store = loadManualStats();
+    const by = store?.byPlatform || {};
+    const out = [];
+    Object.entries(by).forEach(([platform, rows]) => {
+      const latest = Array.isArray(rows) ? rows[rows.length - 1] : rows;
+      if (latest && typeof latest === 'object') out.push([platform, latest]);
+    });
+    return out;
+  };
+
+  const fmt = (n) => Number(n || 0).toLocaleString();
+
+  const collectStats = (row) => {
+    const raw = [
+      ['Followers', row.followers],
+      ['Posts', row.posts ?? row.postsPerWeek],
+      ['Likes', row.likes ?? row.avgLikes],
+      ['Comments', row.comments ?? row.avgComments],
+      ['Shares', row.shares ?? row.avgShares],
+      ['Views', row.views]
+    ];
+
+    const stats = raw.filter(([_, val]) => {
+      if (val === null || val === undefined || val === '') return false;
+      if (typeof val === 'number') return val > 0;
+      const num = Number(val);
+      return Number.isFinite(num) ? num > 0 : String(val).trim() !== '';
+    }).map(([label, val]) => {
+      const num = Number(val);
+      return [label, Number.isFinite(num) ? fmt(num) : String(val)];
+    });
+
+    if (row.niche && String(row.niche).trim()) {
+      stats.push(['Niche', String(row.niche).trim()]);
+    }
+    return stats;
+  };
+
+  const renderWeeklyStatsBox = (cardId, gridId) => {
+    const card = document.getElementById(cardId);
+    const grid = document.getElementById(gridId);
+    if (!card || !grid) return;
+
+    const entries = latestPerPlatform().map(([platform, row]) => {
+      const stats = collectStats(row);
+      return { platform, row, stats };
+    }).filter(item => item.stats.length);
+
+    if (!entries.length) {
+      card.style.display = 'none';
+      grid.innerHTML = '';
+      return;
+    }
+
+    card.style.display = 'block';
+    grid.innerHTML = entries.map(({ platform, row, stats }) => {
+      let dateText = '';
+      if (row.date) {
+        try { dateText = new Date(row.date).toLocaleDateString(); } catch {}
+      }
+      return `
+        <article class="weekly-platform-card">
+          <div class="weekly-platform-title">${prettyPlatform(platform)}</div>
+          <div class="weekly-platform-date">${dateText ? 'Last saved: ' + dateText : 'Latest entry'}</div>
+          <div class="weekly-platform-stats">
+            ${stats.map(([label, value]) => `<span class="weekly-stat-pill"><strong>${label}:</strong> ${value}</span>`).join('')}
+          </div>
+        </article>`;
+    }).join('');
+  };
+
+  window.mbRenderWeeklyStatsBoxes = function(){
+    renderWeeklyStatsBox('libWeeklyStatsCard', 'libWeeklyStatsGrid');
+    renderWeeklyStatsBox('profWeeklyStatsCard', 'profWeeklyStatsGrid');
+  };
+
+  window.mbRenderWeeklyStatsBoxes();
+
+  document.addEventListener('mb:profile-updated', () => window.mbRenderWeeklyStatsBoxes?.());
+  document.getElementById('libRefresh')?.addEventListener('click', () => window.mbRenderWeeklyStatsBoxes?.());
+  document.getElementById('profileTabBtn')?.addEventListener('click', () => window.mbRenderWeeklyStatsBoxes?.());
+  document.querySelectorAll('.tab[data-target="library"], .tab[data-target="profile"]').forEach(btn => {
+    btn.addEventListener('click', () => window.mbRenderWeeklyStatsBoxes?.());
+  });
+
+  const target = document.getElementById('manualStatsSave');
+  if (target) {
+    target.addEventListener('click', () => {
+      setTimeout(() => window.mbRenderWeeklyStatsBoxes?.(), 120);
+    }, true);
+  }
+});
+</script>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const el = (id) => document.getElementById(id);
+  const bioEl = el('profBio');
+  const nameEl = el('profName');
+  const cityEl = el('profCity');
+  const countEl = el('bioCount');
+  const previewText = el('bioPreviewText');
+  const previewName = el('bioPreviewName');
+  const previewCity = el('bioPreviewCity');
+  const saveBtn = el('profSave');
+  const statusA = el('profSaveStatus');
+  const statusB = el('profSaveStatusInline');
+  if (!bioEl || !saveBtn) return;
+
+  const baseProfile = {
+    name: '', city: '', bio: '', pic: '', theme: 'default', color: '#1aa3ff',
+    panelColor: '#f8fafc', textColor: '#0f172a',
+    socials: { ig: '', tw: '', yt: '', sc: '', tt: '', fb: '' },
+    streamUrls: { spotify:'', apple:'', soundcloud:'', ytmusic:'' },
+    playlists: [],
+    streaming: { spotify: false, apple: false, soundcloud: false, ytmusic: false },
+    socialConnected: { ig: false, tw: false, yt: false, tt: false, fb: false },
+    bg: { mode: 'none', preset: '', image: '' }
+  };
+  const normalizeProfile = (raw) => {
+    const p = Object.assign({}, baseProfile, raw || {});
+    p.socials = Object.assign({}, baseProfile.socials, p.socials || {});
+    p.streamUrls = Object.assign({}, baseProfile.streamUrls, p.streamUrls || {});
+    p.streaming = Object.assign({}, baseProfile.streaming, p.streaming || {});
+    p.socialConnected = Object.assign({}, baseProfile.socialConnected, p.socialConnected || {});
+    p.bg = Object.assign({}, baseProfile.bg, p.bg || {});
+    return p;
+  };
+  const loadProfile = () => {
+    try { return normalizeProfile(JSON.parse(localStorage.getItem('mb_profile') || '{}')); }
+    catch { return normalizeProfile({}); }
+  };
+  const saveProfile = (p) => {
+    localStorage.setItem('mb_profile', JSON.stringify(p));
+    document.dispatchEvent(new CustomEvent('mb:profile-updated', { detail: p }));
+  };
+  const setStatus = (msg, saved=false) => {
+    [statusA, statusB].forEach(node => {
+      if (!node) return;
+      node.textContent = msg;
+      node.classList.toggle('is-saved', !!saved);
+      node.classList.toggle('is-idle', !saved);
+    });
+  };
+  const renderPreview = () => {
+    const name = (nameEl?.value || '').trim();
+    const city = (cityEl?.value || '').trim();
+    const bio = (bioEl?.value || '').trim();
+    if (countEl) countEl.textContent = String((bioEl.value || '').length);
+    if (previewName) previewName.textContent = name || 'Your Artist Name';
+    if (previewCity) previewCity.textContent = city || 'Your City';
+    if (previewText) {
+      previewText.textContent = bio || 'Your bio preview will show here as you type.';
+      previewText.classList.toggle('is-empty', !bio);
+    }
+    setStatus('Unsaved profile changes');
+  };
+
+  ['input','change'].forEach(evt => {
+    bioEl.addEventListener(evt, renderPreview);
+    nameEl?.addEventListener(evt, renderPreview);
+    cityEl?.addEventListener(evt, renderPreview);
+  });
+
+  saveBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation?.();
+    const profile = loadProfile();
+    profile.name = (nameEl?.value || '').trim();
+    profile.city = (cityEl?.value || '').trim();
+    profile.bio = (bioEl?.value || '').trim();
+    const color = el('profColor')?.value; if (color) profile.color = color;
+    const panel = el('profPanelColor')?.value; if (panel) profile.panelColor = panel;
+    const text = el('profTextColor')?.value; if (text) profile.textColor = text;
+    saveProfile(profile);
+    renderPreview();
+    setStatus('Profile saved successfully', true);
+    const original = saveBtn.dataset.originalText || saveBtn.textContent || 'Save Profile';
+    saveBtn.dataset.originalText = original;
+    saveBtn.textContent = 'Saved';
+    saveBtn.classList.add('is-saved');
+    saveBtn.disabled = true;
+    setTimeout(() => {
+      saveBtn.textContent = original;
+      saveBtn.classList.remove('is-saved');
+      saveBtn.disabled = false;
+      setStatus('All profile changes are saved', true);
+    }, 1400);
+  }, true);
+
+  const profile = loadProfile();
+  if (nameEl && !nameEl.value) nameEl.value = profile.name || '';
+  if (cityEl && !cityEl.value) cityEl.value = profile.city || '';
+  if (bioEl && !bioEl.value) bioEl.value = profile.bio || '';
+  renderPreview();
+  setStatus('Profile changes are ready to save');
+});
+</script>
+

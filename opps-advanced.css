@@ -1,0 +1,157 @@
+/* ===== MusixBlvd — Opportunities (standalone, safe to replace) ===== */
+
+:root{
+  --mb-blue:#1aa3ff;
+  --mb-blue-2:#0e7fd4;
+  --ink:#0b0b0d;
+  --muted:#64748b;
+  --border:#e5e7eb;
+  --bg:#ffffff;
+}
+
+#opps .panel-card{
+  max-width: 1200px;
+  margin: 0 auto;
+  border:1px solid var(--border);
+  border-radius:16px;
+  background:#fff;
+  box-shadow:0 10px 24px rgba(0,0,0,.06);
+  padding:18px;
+}
+
+/* Header */
+#opps .opps-head{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;
+}
+#opps h2{ margin:0; }
+
+/* Toolbar */
+#opps .opps-toolbar{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0 14px;
+  flex-wrap:wrap;
+}
+#opps .chips{ display:flex; flex-wrap:wrap; gap:8px; }
+#opps .chip{
+  appearance:none;border:1px solid var(--border);background:#fff;color:#0f172a;
+  padding:8px 12px;border-radius:999px;font-weight:700;cursor:pointer;
+  transition:border-color .15s, box-shadow .15s;
+}
+#opps .chip:hover{ border-color:#cbd5e1; }
+#opps .chip.active{ border-color:#93c5fd; box-shadow:0 0 0 3px #93c5fd44; }
+
+#opps .input, #opps select{
+  padding:10px 12px;border:1px solid var(--border);border-radius:10px;font:inherit;background:#fff;
+}
+
+/* Grid of vertical square tiles */
+#opps .opps-grid{
+  display:grid;
+  grid-template-columns:repeat(12, 1fr);
+  gap:14px;
+}
+
+/* Each card spans 4 columns (3 per row desktop), 2 on tablets, 1 on mobile */
+#opps .op-card{
+  grid-column:span 4;
+  display:flex;flex-direction:column;gap:10px;
+  border:1px solid var(--border);border-radius:16px;background:#fff;
+  box-shadow:0 8px 22px rgba(0,0,0,.05);
+  transition:transform .08s ease, box-shadow .2s ease, border-color .2s ease;
+  overflow:hidden;
+}
+#opps .op-card:hover{
+  transform:translateY(-1px);
+  box-shadow:0 16px 34px rgba(0,0,0,.09);
+  border-color:#dbe3ea;
+}
+
+/* Square thumbnail top */
+#opps .thumb{
+  width:100%;
+  aspect-ratio:1/1;
+  background:linear-gradient(180deg,#ecf3ff,#ffffff);
+  position:relative;
+}
+#opps .thumb.audio::after{
+  content:"▶";
+  position:absolute;right:10px;bottom:10px;
+  width:34px;height:34px;border-radius:50%;
+  background:#fff;border:1px solid var(--border);
+  display:grid;place-items:center;font-weight:800;
+  box-shadow:0 6px 14px rgba(0,0,0,.08);
+}
+
+/* Body */
+#opps .card-body{ padding:12px; display:grid; gap:8px; }
+#opps .op-top{ display:flex; align-items:center; gap:10px; }
+#opps .avatar{
+  width:40px;height:40px;border-radius:50%;background:#e2e8f0;display:grid;place-items:center;font-weight:800;color:#0f172a;
+}
+#opps .op-meta{ display:flex; flex-direction:column; gap:2px; }
+#opps .op-title{ font-weight:800; margin:0; letter-spacing:.2px; }
+#opps .op-sub{ font-size:12px; color:#64748b; }
+
+#opps .op-tags{ display:flex; flex-wrap:wrap; gap:6px; }
+#opps .tag{
+  font-size:12px;border:1px solid var(--border);border-radius:999px;padding:4px 8px;background:#f8fafc;font-weight:600;
+}
+
+#opps .op-body{ font-size:14px; color:#0f172a; }
+
+#opps .op-bottom{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:2px; }
+#opps .price{ font-weight:800; color:#0f172a; }
+#opps .op-actions{ display:flex; gap:8px; }
+#opps .btn{ border:0; cursor:pointer; border-radius:10px; padding:10px 12px; font-weight:700; }
+#opps .btn.small{ padding:8px 10px; }
+#opps .btn.primary{
+  background:linear-gradient(180deg,var(--mb-blue),var(--mb-blue-2));
+  color:#fff; box-shadow:0 6px 14px rgba(26,163,255,.25);
+}
+#opps .btn.outline{ background:#fff; border:1px solid var(--border); }
+#opps .btn.outline:hover{ border-color:#cbd5e1; }
+
+#opps .opps-empty{ text-align:center; padding:12px; color:#64748b; }
+
+/* Featured accent (optional) */
+#opps .op-card.featured{ border-color:#ffd27a; box-shadow:0 10px 26px rgba(255,193,7,.15); }
+#opps .featured-badge{
+  position:absolute; left:10px; top:10px;
+  padding:4px 10px; border-radius:999px; background:#fff7e6; border:1px solid #ffd27a; font-weight:800; font-size:11px;
+}
+
+/* Responsive column spans */
+@media (max-width:1100px){
+  #opps .op-card{ grid-column:span 6; } /* 2 per row */
+}
+@media (max-width:640px){
+  #opps .op-card{ grid-column:span 12; } /* 1 per row */
+}
+
+/* Simple modal (if you’re using your existing ones) */
+#opps .modal{ position:fixed; inset:0; display:grid; place-items:center; background:rgba(0,0,0,.35); }
+#opps .modal .modal-card{
+  background:#fff;border:1px solid var(--border);border-radius:16px;padding:16px;max-width:640px;width:min(92vw,640px);box-shadow:0 10px 20px rgba(0,0,0,.15)
+}
+#opps .modal .actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:10px; }
+
+#opps .tabs{display:flex;gap:8px;flex-wrap:wrap}
+#opps .tab{
+  appearance:none;border:1px solid var(--border);background:#fff;
+  padding:8px 12px;border-radius:999px;font-weight:700;cursor:pointer;
+  transition:border-color .15s ease, box-shadow .15s ease
+}
+#opps .tab:hover{border-color:#cbd5e1}
+#opps .tab.active{
+  background:linear-gradient(180deg,var(--mb-blue),var(--mb-blue-2));
+  color:#fff;border-color:transparent;
+  box-shadow:0 6px 16px rgba(26,163,255,.28)
+}
+#opps .search{position:relative;display:flex;align-items:center}
+#opps .search input{
+  border:1px solid var(--border);border-radius:12px;
+  padding:10px 36px 10px 12px;min-width:260px;background:#fff
+}
+#opps .search .kbd{
+  position:absolute;right:10px;font-size:12px;color:#94a3b8;
+  border:1px solid #e2e8f0;border-radius:6px;padding:1px 6px;background:#f8fafc
+}

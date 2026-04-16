@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MusixBlvd • Home</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .hero{max-width:1100px;margin:0 auto;display:grid;gap:18px;padding:24px;text-align:center}
+    .hero h1{font-size:clamp(24px,4vw,38px);font-weight:800;color:#0f172a}
+    .hero p{color:#475569}
+    .cta{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+    .btn.secondary{background:#fff;border:1px solid #e5e7eb;color:#0f172a}
+    .features{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:8px}
+    .feat{border:1px solid #e5e7eb;border-radius:14px;padding:14px;background:#fff}
+    .feat h3{margin:0 0 6px 0}
+</style>
+
+<style>
+  /* Global visibility helpers */
+  .hidden{ display:none !important; }
+  .panel{ display:none; }
+  .panel.active{ display:block; }
+</style>
+
+</head>
+<body>
+  <main class="hero">
+    <h1>Grow your music brand with AI </h1>
+    <p></p>
+    <div class="cta">
+      <a class="btn primary" href="login.html">Log in</a>
+      <a class="btn secondary" href="registration.html">Get started</a>
+    </div>
+    <section class="features">
+      <div class="feat"><h3>Analyze socials + Streaming</h3><p>Instagram, YouTube, TikTok </p></div>
+      <div class="feat"><h3>AI suggestions</h3><p>Posts, hooks, schedules, captions</p></div>
+      <div class="feat"><h3>Dashboard</h3><p>Top content, trends, next actions</p></div>
+    </section>
+  </main>
+</body>
+</html>

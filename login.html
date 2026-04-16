@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MusixBlvd • Sign in</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <main class="wrap">
+    <section class="card">
+      <img class="brand" src="images/mblogo.jpg" alt="MusixBlvd logo" />
+      <h1 class="title">Sign in</h1>
+
+      <form id="loginForm" class="form" autocomplete="on">
+        <label class="field">
+          <span class="icon" aria-hidden="true">🎧</span>
+          <input id="email" type="email" name="email" placeholder="Email address" required />
+        </label>
+
+        <label class="field">
+          <span class="icon" aria-hidden="true">🔒</span>
+          <input id="password" type="password" name="password" placeholder="Password" minlength="6" required />
+          <button type="button" class="ghost toggle" id="togglePass" aria-label="Show password">Show</button>
+        </label>
+
+        <div class="row">
+          <label class="check"><input type="checkbox" id="remember" name="remember" /><span>Remember me</span></label>
+          <a class="link" href="#" aria-disabled="true" title="Coming soon">Forgot password?</a>
+        </div>
+
+        <button class="btn primary" id="loginBtn" type="submit">Log In</button>
+        <div id="loginStatus" class="tiny muted" style="margin-top:8px;min-height:20px;">Ready to sign in.</div>
+
+        <div class="tiny muted" style="margin-top:6px;">or continue with</div>
+        <div class="social-grid">
+          <button id="btn-google" class="btn social" type="button"><span class="svg">G</span> Continue with Google</button>
+        </div>
+        <p class="tiny muted">Google sign-in is enabled for this login page.</p>
+
+      
+<p class="tiny muted" style="margin-top:10px;text-align:center;">
+  Don’t have an account?
+  <a href="registration.html" class="link">Create one</a>
+</p>
+
+ </form>
+    </section>
+  </main>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import {
+      getAuth,
+      setPersistence,
+      browserLocalPersistence,
+      browserSessionPersistence,
+      signInWithEmailAndPassword,
+      GoogleAuthProvider,
+      signInWithPopup
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBDoYwaIR1lIrXD471g9jwJbER1cBPn-qg",
+      authDomain: "musixblvd-f12d1.firebaseapp.com",
+      projectId: "musixblvd-f12d1",
+      storageBucket: "musixblvd-f12d1.firebasestorage.app",
+      messagingSenderId: "276852696625",
+      appId: "1:276852696625:web:305145d798be9b51fd9710",
+      measurementId: "G-VKWP7Q0958"
+    };
+
+    const DASHBOARD_URL = "dashboard.html";
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const form = document.getElementById('loginForm');
+    const emailEl = document.getElementById('email');
+    const passwordEl = document.getElementById('password');
+    const rememberEl = document.getElementById('remember');
+    const statusEl = document.getElementById('loginStatus');
+    const loginBtn = document.getElementById('loginBtn');
+    const togglePass = document.getElementById('togglePass');
+
+    function setStatus(message, type = '') {
+      statusEl.textContent = message || '';
+      statusEl.className = 'tiny' + (type === 'err' ? ' err' : ' muted');
+      if (type === 'ok') {
+        statusEl.className = 'tiny';
+        statusEl.style.color = '#16a34a';
+        statusEl.style.fontWeight = '700';
+      } else if (type === 'err') {
+        statusEl.style.color = '#dc2626';
+        statusEl.style.fontWeight = '700';
+      } else {
+        statusEl.style.color = '';
+        statusEl.style.fontWeight = '';
+      }
+    }
+
+    function mapAuthError(error) {
+      const code = error?.code || '';
+      switch (code) {
+        case 'auth/invalid-email': return 'Enter a valid email address.';
+        case 'auth/missing-password': return 'Enter your password.';
+        case 'auth/user-not-found':
+        case 'auth/invalid-credential': return 'Email or password is incorrect.';
+        case 'auth/too-many-requests': return 'Too many attempts. Wait a bit and try again.';
+        case 'auth/popup-closed-by-user': return 'Google sign-in was closed before finishing.';
+        case 'auth/cancelled-popup-request': return 'Another sign-in popup was already open.';
+        default: return error?.message || 'Could not sign in right now.';
+      }
+    }
+
+    async function hydrateLocalProfile(user) {
+      try {
+        const snap = await getDoc(doc(db, 'users', user.uid));
+        const saved = snap.exists() ? snap.data() : {};
+        const profile = {
+          fullName: saved.fullName || '',
+          name: saved.artistName || saved.name || '',
+          email: user.email || saved.email || '',
+          role: saved.role || '',
+          genre: saved.genre || '',
+          city: saved.city || '',
+          daw: saved.daw || '',
+          goal: saved.goal || '',
+          bio: saved.bio || '',
+          uid: user.uid,
+          createdAt: saved.createdAt || new Date().toISOString()
+        };
+
+        localStorage.setItem('mb_profile', JSON.stringify(profile));
+        localStorage.setItem('mb_member_signup', JSON.stringify({
+          email: profile.email,
+          fullName: profile.fullName,
+          artistName: profile.name,
+          uid: user.uid,
+          lastLoginAt: new Date().toISOString()
+        }));
+      } catch (error) {
+        localStorage.setItem('mb_member_signup', JSON.stringify({
+          email: user.email || '',
+          uid: user.uid,
+          lastLoginAt: new Date().toISOString()
+        }));
+      }
+    }
+
+    togglePass?.addEventListener('click', () => {
+      const isHidden = passwordEl.type === 'password';
+      passwordEl.type = isHidden ? 'text' : 'password';
+      togglePass.textContent = isHidden ? 'Hide' : 'Show';
+      togglePass.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
+    });
+
+    async function finishSocialLogin(user) {
+      await hydrateLocalProfile(user);
+      setStatus('Login successful. Redirecting to dashboard...', 'ok');
+      setTimeout(() => {
+        window.location.href = DASHBOARD_URL;
+      }, 700);
+    }
+
+    document.getElementById('btn-google')?.addEventListener('click', async () => {
+      try {
+        setStatus('Signing you in with Google...');
+        const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
+        const cred = await signInWithPopup(auth, provider);
+        await finishSocialLogin(cred.user);
+      } catch (error) {
+        setStatus(mapAuthError(error), 'err');
+      }
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = emailEl.value.trim();
+      const password = passwordEl.value;
+
+      if (!email || !password) {
+        setStatus('Enter your email and password.', 'err');
+        return;
+      }
+
+      loginBtn.disabled = true;
+      setStatus('Signing you in...');
+
+      try {
+        await setPersistence(auth, rememberEl.checked ? browserLocalPersistence : browserSessionPersistence);
+        const cred = await signInWithEmailAndPassword(auth, email, password);
+        await hydrateLocalProfile(cred.user);
+        setStatus('Login successful. Redirecting to dashboard...', 'ok');
+        setTimeout(() => {
+          window.location.href = DASHBOARD_URL;
+        }, 700);
+      } catch (error) {
+        setStatus(mapAuthError(error), 'err');
+      } finally {
+        loginBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
