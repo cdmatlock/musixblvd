@@ -8649,11 +8649,17 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
 <script>
 (function () {
   const MB_META_APP_ID = '982607594515248';
-  const MB_INSTAGRAM_REDIRECT_URI = 'https://musixblvd.onrender.com/dashboard.html';
   const MB_FB_LOGIN_CONFIG_ID = ''; // optional later if Meta gives you a config ID
 
+  function mbGetInstagramRedirectUri() {
+    const isLocal = /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname || '');
+    const localPath = window.location.pathname || '/dashboard.html';
+    if (isLocal) return window.location.origin + localPath;
+    return 'https://musixblvd.onrender.com/dashboard.html';
+  }
+
   function mbInstagramOauthUrl() {
-    const redirectUri = MB_INSTAGRAM_REDIRECT_URI;
+    const redirectUri = mbGetInstagramRedirectUri();
     const state = 'mbig_' + Date.now();
     try { localStorage.setItem('mb_instagram_oauth_state', state); } catch(e) {}
     const params = new URLSearchParams({
@@ -8666,8 +8672,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
         'pages_show_list',
         'pages_read_engagement',
         'business_management',
-        'instagram_basic',
-        'instagram_manage_insights'
+        'instagram_basic'
       ].join(','),
       state
     });
@@ -8720,7 +8725,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     const savedState = localStorage.getItem('mb_instagram_oauth_state');
     if (code) {
       localStorage.setItem('mb_instagram_auth_code', code);
-      mbShowInstagramStatus('Instagram authorization code received. The login redirect is working. Next step is backend token exchange to pull live stats.', true);
+      mbShowInstagramStatus('Instagram authorization code received. The login redirect is working. Next step is backend token exchange to pull the first live Instagram account fields.', true);
       if (!savedState || !state || state === savedState) {
         url.searchParams.delete('code');
         url.searchParams.delete('state');
