@@ -17,7 +17,7 @@
     }
     *{ box-sizing:border-box; }
     html, body { height:100%; max-width:100%; overflow-x:hidden; }
-    body{
+    body
       margin:0;
       font-family:Poppins,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
       color:#0f172a;
@@ -1535,7 +1535,7 @@
 <img alt="" aria-hidden="true" class="mikey-mini" src="images/boulevard.png"/>
 <span>Chat with MIKEY</span>
 </div>
-<div class="tiny" style="color:#cbd5e1">MusixBlvd music assistant</div>
+<div class="tiny" style="color:#cbd5e1">MusixBlvd</div>
 </div>
 <div class="mikey-custom-chat-wrap">
 <div aria-live="polite" class="dir-chat-log mikey-chat-log" id="mikeyMessages">
@@ -1563,22 +1563,11 @@ Yo, I’m MIKEY. Ask me about promo strategy, rollout ideas, hooks, audience gro
 
 </div>
 </header>
-<div class="lib-card">
-<h3>Connect Streaming Platforms</h3>
-<p class="muted">Grant Mikey access to pull your latest streams and track performances.</p>
-<div class="lib-providers">
-<button class="prov" data-p="spotify" type="button">Spotify</button>
-<button class="prov" data-p="apple" type="button">Apple Music</button>
-<button class="prov" data-p="soundcloud" type="button">SoundCloud</button>
-</div>
-<label class="check" style="margin-top:8px">
-<input id="libConsent" type="checkbox">
-<span>I agree to connect read-only analytics for my streaming accounts.</span>
-</input></label>
-<div class="row" style="gap:8px;margin-top:10px">
-<button class="btn primary" disabled="" id="libConnect" type="button">Connect Accounts</button>
-<span class="tiny muted" id="libConnectStatus"></span>
-</div>
+<div class="hidden" aria-hidden="true" style="display:none !important">
+<div class="lib-providers"></div>
+<input id="libConsent" type="checkbox" hidden=""/>
+<button class="btn primary" id="libConnect" type="button" hidden="">Connect Accounts</button>
+<span class="tiny muted" id="libConnectStatus" hidden=""></span>
 </div>
 <!-- Totals card (shows after Connect) -->
 <div class="lib-card panel-card" id="viewsCard" style="margin-top:12px; display:none;">
@@ -1602,7 +1591,7 @@ Yo, I’m MIKEY. Ask me about promo strategy, rollout ideas, hooks, audience gro
 <h3>Upload a Song for Analysis</h3>
 <p class="muted">MP3/WAV/AAC/FLAC supported (browser decode). We’ll analyze loudness, peaks, stereo, and estimate BPM.</p>
 <div class="uploader">
-<input accept="audio/*" id="libFile" type="file">
+<input accept=".mp3,.wav,.aac,.m4a,.flac,.ogg,.opus,.webm,audio/*" id="libFile" type="file">
 <button class="btn primary" disabled="" id="analyzeBtn" type="button">Analyze</button>
 </input></div>
 <audio controls="" id="player" style="width:100%;display:none;margin-top:10px"></audio>
@@ -8438,6 +8427,350 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
 })();
 </script>
 <!-- MIKEY FLOATING ASSISTANT END -->
+
+
+<script id="mb-library-audio-upload-fix">
+(() => {
+  const fileInput = document.getElementById('libFile');
+  const analyzeBtn = document.getElementById('analyzeBtn');
+  const player = document.getElementById('player');
+  const fileMeta = document.getElementById('fileMeta');
+  const analysisStats = document.getElementById('analysisStats');
+  const adviceList = document.getElementById('adviceList');
+
+  if (!fileInput || !analyzeBtn || !player || !fileMeta || !analysisStats) return;
+
+  const statValues = analysisStats.querySelectorAll('strong');
+  const AUDIO_EXT_RE = /\.(mp3|wav|aac|m4a|flac|ogg|opus|webm)$/i;
+  let currentFile = null;
+  let currentBlobUrl = '';
+
+  const fmtNumber = (value, digits = 1) => Number.isFinite(value) ? Number(value).toFixed(digits) : '—';
+  const fmtDb = (value) => Number.isFinite(value) ? `${value.toFixed(1)} dBFS` : '—';
+  const fmtTime = (seconds) => {
+    if (!Number.isFinite(seconds)) return '—';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.round(seconds % 60).toString().padStart(2, '0');
+    return `${mins}:${secs}`;
+  };
+
+  function setStats(values = []) {
+    statValues.forEach((node, idx) => {
+      node.textContent = values[idx] ?? '—';
+    });
+  }
+
+  function setAdvice(items = []) {
+    if (!adviceList) return;
+    if (!items.length) {
+      adviceList.innerHTML = '<li>Upload a song to get quick mix and loudness advice.</li>';
+      return;
+    }
+    adviceList.innerHTML = items.map((item) => `<li>${item}</li>`).join('');
+  }
+
+  function clearPreview(message = 'Choose an audio file to analyze.') {
+    setStats(['—','—','—','—','—','—','—','—']);
+    setAdvice([]);
+    if (fileMeta) fileMeta.textContent = message;
+    analyzeBtn.disabled = true;
+    currentFile = null;
+    if (currentBlobUrl) {
+      try { URL.revokeObjectURL(currentBlobUrl); } catch {}
+      currentBlobUrl = '';
+    }
+    player.pause();
+    player.removeAttribute('src');
+    player.style.display = 'none';
+  }
+
+  function isAudioFile(file) {
+    if (!file) return false;
+    const type = String(file.type || '').toLowerCase();
+    const name = String(file.name || '');
+    return type.startsWith('audio/') || AUDIO_EXT_RE.test(name);
+  }
+
+  function estimateBpm(samples, sampleRate) {
+    if (!samples?.length || !sampleRate) return null;
+    const step = Math.max(1, Math.floor(sampleRate * 0.05));
+    const energies = [];
+    for (let i = 0; i < samples.length; i += step) {
+      let sum = 0;
+      const end = Math.min(i + step, samples.length);
+      for (let j = i; j < end; j++) sum += Math.abs(samples[j]);
+      energies.push(sum / Math.max(1, end - i));
+    }
+    if (energies.length < 8) return null;
+    const avg = energies.reduce((a, b) => a + b, 0) / energies.length;
+    const threshold = avg * 1.35;
+    const peaks = [];
+    for (let i = 1; i < energies.length - 1; i++) {
+      if (energies[i] > threshold && energies[i] > energies[i - 1] && energies[i] >= energies[i + 1]) {
+        peaks.push(i);
+      }
+    }
+    if (peaks.length < 2) return null;
+    const intervals = [];
+    for (let i = 1; i < peaks.length; i++) {
+      const seconds = (peaks[i] - peaks[i - 1]) * 0.05;
+      if (seconds > 0.25 && seconds < 2) intervals.push(seconds);
+    }
+    if (!intervals.length) return null;
+    const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    let bpm = 60 / avgInterval;
+    while (bpm < 70) bpm *= 2;
+    while (bpm > 180) bpm /= 2;
+    return Math.round(bpm);
+  }
+
+  async function analyzeCurrentFile() {
+    if (!currentFile) return;
+    analyzeBtn.disabled = true;
+    fileMeta.textContent = `Analyzing ${currentFile.name}...`;
+
+    try {
+      const arrayBuffer = await currentFile.arrayBuffer();
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) throw new Error('This browser does not support audio analysis.');
+      const audioCtx = new AudioCtx();
+      const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+
+      const channels = audioBuffer.numberOfChannels || 1;
+      const sampleRate = audioBuffer.sampleRate || 0;
+      const duration = audioBuffer.duration || 0;
+      const length = audioBuffer.length || 0;
+      const mono = new Float32Array(length);
+      let peak = 0;
+      let sumSquares = 0;
+      let clipped = false;
+
+      for (let c = 0; c < channels; c++) {
+        const data = audioBuffer.getChannelData(c);
+        for (let i = 0; i < length; i++) {
+          const sample = data[i] || 0;
+          mono[i] += sample / channels;
+          const abs = Math.abs(sample);
+          if (abs > peak) peak = abs;
+          if (abs >= 0.999) clipped = true;
+          sumSquares += sample * sample;
+        }
+      }
+
+      let monoPeak = 0;
+      let monoSquares = 0;
+      for (let i = 0; i < mono.length; i++) {
+        const abs = Math.abs(mono[i]);
+        if (abs > monoPeak) monoPeak = abs;
+        monoSquares += mono[i] * mono[i];
+      }
+
+      const rms = Math.sqrt(sumSquares / Math.max(1, length * channels));
+      const peakDb = peak > 0 ? 20 * Math.log10(peak) : -Infinity;
+      const rmsDb = rms > 0 ? 20 * Math.log10(rms) : -Infinity;
+      const dynamicRange = Number.isFinite(peakDb) && Number.isFinite(rmsDb) ? peakDb - rmsDb : null;
+      const bpm = estimateBpm(mono, sampleRate);
+
+      setStats([
+        fmtTime(duration),
+        String(channels),
+        sampleRate ? `${sampleRate} Hz` : '—',
+        fmtDb(peakDb),
+        fmtDb(rmsDb),
+        Number.isFinite(dynamicRange) ? `${dynamicRange.toFixed(1)} dB` : '—',
+        bpm ? `${bpm} BPM` : '—',
+        clipped ? 'Yes' : 'No'
+      ]);
+
+      const advice = [];
+      if (Number.isFinite(rmsDb)) {
+        if (rmsDb < -18) advice.push('The song is reading pretty quiet. A stronger master could help it feel more competitive.');
+        else if (rmsDb > -8) advice.push('This master is very hot. Check for harshness and listener fatigue before release.');
+        else advice.push('The loudness looks solid for a rough streaming-ready reference.');
+      }
+      if (clipped) advice.push('Clipping was detected, so lower the limiter or export level a little before release.');
+      if (Number.isFinite(dynamicRange)) {
+        if (dynamicRange < 6) advice.push('Dynamic range is pretty tight. Letting the mix breathe a little more may improve punch.');
+        else if (dynamicRange > 14) advice.push('Dynamic range is wide, which can sound musical, but make sure quieter parts still translate well.');
+      }
+      if (channels === 1) advice.push('This file is mono. That can be fine creatively, but check whether you wanted a stereo export.');
+      if (bpm) advice.push(`Estimated tempo is around ${bpm} BPM, so you can use that for content planning and remix ideas.`);
+      setAdvice(advice);
+
+      const sizeMb = currentFile.size ? (currentFile.size / (1024 * 1024)).toFixed(2) : null;
+      fileMeta.textContent = `${currentFile.name}${sizeMb ? ` • ${sizeMb} MB` : ''}`;
+
+      try { await audioCtx.close(); } catch {}
+    } catch (error) {
+      console.error('Audio analysis failed:', error);
+      setStats(['—','—','—','—','—','—','—','—']);
+      setAdvice(['This file could not be decoded in the browser. Try MP3, WAV, AAC, M4A, FLAC, OGG, or WebM audio.']);
+      fileMeta.textContent = error?.message || 'Could not analyze that file.';
+    } finally {
+      analyzeBtn.disabled = !currentFile;
+    }
+  }
+
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      clearPreview();
+      return;
+    }
+
+    if (!isAudioFile(file)) {
+      clearPreview('Please choose an audio file like MP3, WAV, AAC, M4A, FLAC, OGG, OPUS, or WebM audio.');
+      try { fileInput.value = ''; } catch {}
+      return;
+    }
+
+    currentFile = file;
+    analyzeBtn.disabled = false;
+    const sizeMb = file.size ? (file.size / (1024 * 1024)).toFixed(2) : null;
+    fileMeta.textContent = `${file.name}${sizeMb ? ` • ${sizeMb} MB` : ''}`;
+
+    if (currentBlobUrl) {
+      try { URL.revokeObjectURL(currentBlobUrl); } catch {}
+    }
+    currentBlobUrl = URL.createObjectURL(file);
+    player.src = currentBlobUrl;
+    player.style.display = 'block';
+
+    setStats(['—','—','—','—','—','—','—','—']);
+    setAdvice(['Press Analyze to scan loudness, peaks, stereo information, and estimated BPM.']);
+  });
+
+  analyzeBtn.addEventListener('click', analyzeCurrentFile);
+  clearPreview();
+})();
+</script>
+
+
+<script>
+/* =====================================================================
+   INSTAGRAM OAUTH OVERRIDE (safe append patch)
+   Replaces old manual Instagram modal flow with Meta OAuth launch.
+===================================================================== */
+(function () {
+  const INSTAGRAM_APP_ID = '982607594515248';
+  const OAUTH_SCOPES = [
+    'business_management',
+    'instagram_basic',
+    'instagram_business_basic',
+    'instagram_business_manage_insights',
+    'pages_show_list',
+    'pages_read_engagement'
+  ].join(',');
+
+  function currentRedirectUri() {
+    const url = new URL(window.location.href);
+    url.hash = '';
+    url.search = '';
+    return url.toString();
+  }
+
+  function buildInstagramOauthUrl() {
+    const redirectUri = currentRedirectUri();
+    const authUrl = new URL('https://www.facebook.com/v23.0/dialog/oauth');
+    authUrl.searchParams.set('client_id', INSTAGRAM_APP_ID);
+    authUrl.searchParams.set('redirect_uri', redirectUri);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('scope', OAUTH_SCOPES);
+    return authUrl.toString();
+  }
+
+  function setInstagramStatus(message, kind) {
+    const aiResults = document.getElementById('aiResults');
+    const manualAdviceBox = document.getElementById('manualAdviceBox');
+    if (aiResults) aiResults.classList.remove('hidden');
+    if (!manualAdviceBox) return;
+    manualAdviceBox.innerHTML =
+      '<div style="padding:12px;border-radius:12px;border:1px solid ' +
+      (kind === 'ok' ? '#bbf7d0;background:#f0fdf4;color:#166534' : kind === 'warn' ? '#fde68a;background:#fffbeb;color:#92400e' : '#dbeafe;background:#eff6ff;color:#1d4ed8') +
+      ';font-weight:700;">' + message + '</div>';
+  }
+
+  function launchInstagramOauth() {
+    try {
+      localStorage.setItem('mb_instagram_oauth_started_at', new Date().toISOString());
+      localStorage.setItem('mb_instagram_oauth_redirect', currentRedirectUri());
+    } catch {}
+    window.location.href = buildInstagramOauthUrl();
+  }
+
+  function closeInstagramModalIfOpen() {
+    const modal = document.getElementById('connectModal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.setAttribute('aria-hidden', 'true');
+    }
+  }
+
+  function isInstagramConnectSave(eventTarget) {
+    const saveBtn = eventTarget.closest('#connectSave');
+    if (!saveBtn) return false;
+    const modal = document.getElementById('connectModal');
+    const title = document.getElementById('connectTitle')?.textContent || '';
+    const providerKey = (modal?.dataset?.providerKey || '').toLowerCase();
+    return providerKey.includes('instagram') || /instagram/i.test(title);
+  }
+
+  document.addEventListener('click', function (e) {
+    const instagramProvBtn = e.target.closest('#ai .providers .prov[data-p="instagram"]');
+    const instagramToggle = e.target.closest('#igToggle');
+
+    if (instagramProvBtn || instagramToggle) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation?.();
+      closeInstagramModalIfOpen();
+      launchInstagramOauth();
+      return;
+    }
+
+    if (isInstagramConnectSave(e.target)) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation?.();
+      closeInstagramModalIfOpen();
+      launchInstagramOauth();
+    }
+  }, true);
+
+  window.addEventListener('load', function () {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const error = params.get('error') || params.get('error_reason') || params.get('error_description');
+
+    if (code) {
+      try {
+        localStorage.setItem('mb_instagram_auth_code', code);
+        localStorage.setItem('mb_instagram_auth_code_received_at', new Date().toISOString());
+      } catch {}
+      setInstagramStatus('Instagram authorization code received. The button is now launching the real Meta login flow. Next step is backend token exchange to pull live stats.', 'ok');
+
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('code');
+      cleanUrl.searchParams.delete('state');
+      cleanUrl.searchParams.delete('error');
+      cleanUrl.searchParams.delete('error_reason');
+      cleanUrl.searchParams.delete('error_description');
+      window.history.replaceState({}, document.title, cleanUrl.toString());
+      return;
+    }
+
+    if (error) {
+      setInstagramStatus('Instagram connection was canceled or blocked before completion.', 'warn');
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('state');
+      cleanUrl.searchParams.delete('error');
+      cleanUrl.searchParams.delete('error_reason');
+      cleanUrl.searchParams.delete('error_description');
+      window.history.replaceState({}, document.title, cleanUrl.toString());
+    }
+  });
+})();
+</script>
 
 </body>
 </html>
