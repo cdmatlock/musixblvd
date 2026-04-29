@@ -8647,128 +8647,95 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
 
 
 <script>
-/* =====================================================================
-   INSTAGRAM OAUTH OVERRIDE (safe append patch)
-   Replaces old manual Instagram modal flow with Meta OAuth launch.
-===================================================================== */
 (function () {
-  const INSTAGRAM_APP_ID = '982607594515248';
-  const OAUTH_SCOPES = [
-    'business_management',
-    'instagram_basic',
-    'instagram_business_basic',
-    'instagram_business_manage_insights',
-    'pages_show_list',
-    'pages_read_engagement'
-  ].join(',');
+  const MB_META_APP_ID = '982607594515248';
+  const MB_INSTAGRAM_REDIRECT_URI = 'https://musixblvd.onrender.com/dashboard.html';
+  const MB_FB_LOGIN_CONFIG_ID = ''; // optional later if Meta gives you a config ID
 
-  function currentRedirectUri() {
-    const url = new URL(window.location.href);
-    url.hash = '';
-    url.search = '';
-    return url.toString();
+  function mbInstagramOauthUrl() {
+    const redirectUri = MB_INSTAGRAM_REDIRECT_URI;
+    const state = 'mbig_' + Date.now();
+    try { localStorage.setItem('mb_instagram_oauth_state', state); } catch(e) {}
+    const params = new URLSearchParams({
+      client_id: MB_META_APP_ID,
+      app_id: MB_META_APP_ID,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: [
+        'public_profile',
+        'pages_show_list',
+        'pages_read_engagement',
+        'business_management',
+        'instagram_basic',
+        'instagram_manage_insights'
+      ].join(','),
+      state
+    });
+    if (MB_FB_LOGIN_CONFIG_ID) params.set('config_id', MB_FB_LOGIN_CONFIG_ID);
+    return 'https://www.facebook.com/v23.0/dialog/oauth?' + params.toString();
   }
 
-  function buildInstagramOauthUrl() {
-    const redirectUri = currentRedirectUri();
-    const authUrl = new URL('https://www.facebook.com/v23.0/dialog/oauth');
-    authUrl.searchParams.set('client_id', INSTAGRAM_APP_ID);
-    authUrl.searchParams.set('redirect_uri', redirectUri);
-    authUrl.searchParams.set('response_type', 'code');
-    authUrl.searchParams.set('scope', OAUTH_SCOPES);
-    return authUrl.toString();
+  function mbStartInstagramOauth() {
+    const url = mbInstagramOauthUrl();
+    window.location.href = url;
   }
 
-  function setInstagramStatus(message, kind) {
-    const aiResults = document.getElementById('aiResults');
-    const manualAdviceBox = document.getElementById('manualAdviceBox');
-    if (aiResults) aiResults.classList.remove('hidden');
-    if (!manualAdviceBox) return;
-    manualAdviceBox.innerHTML =
-      '<div style="padding:12px;border-radius:12px;border:1px solid ' +
-      (kind === 'ok' ? '#bbf7d0;background:#f0fdf4;color:#166534' : kind === 'warn' ? '#fde68a;background:#fffbeb;color:#92400e' : '#dbeafe;background:#eff6ff;color:#1d4ed8') +
-      ';font-weight:700;">' + message + '</div>';
-  }
-
-  function launchInstagramOauth() {
-    try {
-      localStorage.setItem('mb_instagram_oauth_started_at', new Date().toISOString());
-      localStorage.setItem('mb_instagram_oauth_redirect', currentRedirectUri());
-    } catch {}
-    window.location.href = buildInstagramOauthUrl();
-  }
-
-  function closeInstagramModalIfOpen() {
-    const modal = document.getElementById('connectModal');
-    if (modal) {
-      modal.classList.add('hidden');
-      modal.setAttribute('aria-hidden', 'true');
+  function mbShowInstagramStatus(msg, ok) {
+    const results = document.getElementById('aiResults');
+    const box = document.getElementById('manualAdviceBox');
+    if (results) results.classList.remove('hidden');
+    if (box) {
+      box.innerHTML = '<div style="padding:10px 12px;border:1px solid ' + (ok ? '#bbf7d0' : '#fecaca') + ';border-radius:12px;background:' + (ok ? '#ecfdf3' : '#fef2f2') + ';color:' + (ok ? '#166534' : '#b91c1c') + ';font-weight:700;">' + msg + '</div>';
     }
-  }
-
-  function isInstagramConnectSave(eventTarget) {
-    const saveBtn = eventTarget.closest('#connectSave');
-    if (!saveBtn) return false;
-    const modal = document.getElementById('connectModal');
-    const title = document.getElementById('connectTitle')?.textContent || '';
-    const providerKey = (modal?.dataset?.providerKey || '').toLowerCase();
-    return providerKey.includes('instagram') || /instagram/i.test(title);
   }
 
   document.addEventListener('click', function (e) {
-    const instagramProvBtn = e.target.closest('#ai .providers .prov[data-p="instagram"]');
-    const instagramToggle = e.target.closest('#igToggle');
+    const igBtn = e.target.closest('#ai .providers .prov[data-p="instagram"], #igToggle');
+    if (!igBtn) return;
 
-    if (instagramProvBtn || instagramToggle) {
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation?.();
-      closeInstagramModalIfOpen();
-      launchInstagramOauth();
-      return;
-    }
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
 
-    if (isInstagramConnectSave(e.target)) {
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation?.();
-      closeInstagramModalIfOpen();
-      launchInstagramOauth();
-    }
+    mbStartInstagramOauth();
   }, true);
 
-  window.addEventListener('load', function () {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get('code');
-    const error = params.get('error') || params.get('error_reason') || params.get('error_description');
+  const connectSave = document.getElementById('connectSave');
+  if (connectSave && !connectSave.dataset.mbInstagramOauthRedirect) {
+    connectSave.dataset.mbInstagramOauthRedirect = 'true';
+    connectSave.addEventListener('click', function (e) {
+      const title = (document.getElementById('connectTitle')?.textContent || '').toLowerCase();
+      if (!title.includes('instagram')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      mbStartInstagramOauth();
+    }, true);
+  }
 
+  try {
+    const url = new URL(window.location.href);
+    const code = url.searchParams.get('code');
+    const state = url.searchParams.get('state');
+    const savedState = localStorage.getItem('mb_instagram_oauth_state');
     if (code) {
-      try {
-        localStorage.setItem('mb_instagram_auth_code', code);
-        localStorage.setItem('mb_instagram_auth_code_received_at', new Date().toISOString());
-      } catch {}
-      setInstagramStatus('Instagram authorization code received. The button is now launching the real Meta login flow. Next step is backend token exchange to pull live stats.', 'ok');
-
-      const cleanUrl = new URL(window.location.href);
-      cleanUrl.searchParams.delete('code');
-      cleanUrl.searchParams.delete('state');
-      cleanUrl.searchParams.delete('error');
-      cleanUrl.searchParams.delete('error_reason');
-      cleanUrl.searchParams.delete('error_description');
-      window.history.replaceState({}, document.title, cleanUrl.toString());
-      return;
+      localStorage.setItem('mb_instagram_auth_code', code);
+      mbShowInstagramStatus('Instagram authorization code received. The login redirect is working. Next step is backend token exchange to pull live stats.', true);
+      if (!savedState || !state || state === savedState) {
+        url.searchParams.delete('code');
+        url.searchParams.delete('state');
+        url.searchParams.delete('granted_scopes');
+        window.history.replaceState({}, document.title, url.toString());
+      }
     }
-
-    if (error) {
-      setInstagramStatus('Instagram connection was canceled or blocked before completion.', 'warn');
-      const cleanUrl = new URL(window.location.href);
-      cleanUrl.searchParams.delete('state');
-      cleanUrl.searchParams.delete('error');
-      cleanUrl.searchParams.delete('error_reason');
-      cleanUrl.searchParams.delete('error_description');
-      window.history.replaceState({}, document.title, cleanUrl.toString());
+    const err = url.searchParams.get('error') || url.searchParams.get('error_reason');
+    const errDesc = url.searchParams.get('error_description');
+    if (err) {
+      mbShowInstagramStatus('Instagram login error: ' + (errDesc || err), false);
     }
-  });
+  } catch (e) {
+    console.warn('Instagram OAuth patch readback failed', e);
+  }
 })();
 </script>
 
