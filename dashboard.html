@@ -8648,8 +8648,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
 
 <script>
 (function () {
-  const MB_META_APP_ID = '982607594515248';
-  const MB_FB_LOGIN_CONFIG_ID = ''; // optional later if Meta gives you a config ID
+  const MB_INSTAGRAM_APP_ID = '3223245321188975';
 
   function mbGetInstagramRedirectUri() {
     const isLocal = /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname || '');
@@ -8661,28 +8660,23 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
   function mbInstagramOauthUrl() {
     const redirectUri = mbGetInstagramRedirectUri();
     const state = 'mbig_' + Date.now();
-    try { localStorage.setItem('mb_instagram_oauth_state', state); } catch(e) {}
+    try { localStorage.setItem('mb_instagram_oauth_state', state); } catch (e) {}
+
     const params = new URLSearchParams({
-      client_id: MB_META_APP_ID,
-      app_id: MB_META_APP_ID,
+      enable_fb_login: '0',
+      force_authentication: '1',
+      client_id: MB_INSTAGRAM_APP_ID,
       redirect_uri: redirectUri,
       response_type: 'code',
-      scope: [
-        'public_profile',
-        'pages_show_list',
-        'pages_read_engagement',
-        'business_management',
-        'instagram_basic'
-      ].join(','),
+      scope: 'instagram_business_basic',
       state
     });
-    if (MB_FB_LOGIN_CONFIG_ID) params.set('config_id', MB_FB_LOGIN_CONFIG_ID);
-    return 'https://www.facebook.com/v23.0/dialog/oauth?' + params.toString();
+
+    return 'https://www.instagram.com/oauth/authorize?' + params.toString();
   }
 
   function mbStartInstagramOauth() {
-    const url = mbInstagramOauthUrl();
-    window.location.href = url;
+    window.location.href = mbInstagramOauthUrl();
   }
 
   function mbShowInstagramStatus(msg, ok) {
@@ -8705,38 +8699,44 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     mbStartInstagramOauth();
   }, true);
 
-  const connectSave = document.getElementById('connectSave');
-  if (connectSave && !connectSave.dataset.mbInstagramOauthRedirect) {
-    connectSave.dataset.mbInstagramOauthRedirect = 'true';
-    connectSave.addEventListener('click', function (e) {
-      const title = (document.getElementById('connectTitle')?.textContent || '').toLowerCase();
-      if (!title.includes('instagram')) return;
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-      mbStartInstagramOauth();
-    }, true);
-  }
+  document.addEventListener('click', function (e) {
+    const saveBtn = e.target.closest('#connectSave');
+    const modal = document.getElementById('connectModal');
+    const title = document.getElementById('connectTitle');
+    if (!saveBtn || !modal || modal.classList.contains('hidden')) return;
+    const t = String(title?.textContent || '').toLowerCase();
+    if (!t.includes('instagram')) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+
+    modal.classList.add('hidden');
+    mbStartInstagramOauth();
+  }, true);
 
   try {
     const url = new URL(window.location.href);
     const code = url.searchParams.get('code');
-    const state = url.searchParams.get('state');
-    const savedState = localStorage.getItem('mb_instagram_oauth_state');
-    if (code) {
-      localStorage.setItem('mb_instagram_auth_code', code);
-      mbShowInstagramStatus('Instagram authorization code received. The login redirect is working. Next step is backend token exchange to pull the first live Instagram account fields.', true);
-      if (!savedState || !state || state === savedState) {
-        url.searchParams.delete('code');
-        url.searchParams.delete('state');
-        url.searchParams.delete('granted_scopes');
-        window.history.replaceState({}, document.title, url.toString());
-      }
-    }
-    const err = url.searchParams.get('error') || url.searchParams.get('error_reason');
+    const err = url.searchParams.get('error');
     const errDesc = url.searchParams.get('error_description');
-    if (err) {
+
+    if (code) {
+      try { localStorage.setItem('mb_instagram_auth_code', code); } catch (e) {}
+      mbShowInstagramStatus('Instagram login connected. Authorization code received. Next step is backend token exchange to pull whatever Instagram data your app is allowed to read.', true);
+      url.searchParams.delete('code');
+      url.searchParams.delete('state');
+      url.searchParams.delete('error');
+      url.searchParams.delete('error_reason');
+      url.searchParams.delete('error_description');
+      window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : '') + url.hash);
+    } else if (err) {
       mbShowInstagramStatus('Instagram login error: ' + (errDesc || err), false);
+      url.searchParams.delete('error');
+      url.searchParams.delete('error_reason');
+      url.searchParams.delete('error_description');
+      url.searchParams.delete('state');
+      window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : '') + url.hash);
     }
   } catch (e) {
     console.warn('Instagram OAuth patch readback failed', e);
