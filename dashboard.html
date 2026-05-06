@@ -8748,47 +8748,112 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     return data;
   }
 
-  function mbRenderInstagramProfile(profileData) {
+  async function mbFetchInstagramMedia(accessToken) {
+    const resp = await fetch('/api/instagram/media', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ access_token: accessToken })
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      throw new Error(data?.error_message || data?.error || 'Instagram media fetch failed.');
+    }
+    return data;
+  }
+
+  function mbShortText(value, maxLen) {
+    const raw = String(value == null ? '' : value).trim();
+    if (!raw) return '';
+    if (raw.length <= maxLen) return raw;
+    return raw.slice(0, Math.max(0, maxLen - 1)).trimEnd() + '…';
+  }
+
+  function mbRenderInstagramProfile(profileData, mediaItems) {
     const results = document.getElementById('aiResults');
     const signalsList = document.getElementById('signalsList');
     const movesList = document.getElementById('movesList');
     const planBox = document.getElementById('planBox');
     const proInsightsBox = document.getElementById('proInsightsBox');
+    const media = Array.isArray(mediaItems) ? mediaItems : [];
 
     if (results) results.classList.remove('hidden');
 
     if (signalsList) {
-      signalsList.innerHTML = [
+      const signalBits = [
         '<li><strong>Instagram username:</strong> ' + mbEscapeHtml(profileData?.username || '—') + '</li>',
         '<li><strong>Instagram user ID:</strong> ' + mbEscapeHtml(profileData?.user_id || '—') + '</li>',
         '<li><strong>Account type:</strong> ' + mbEscapeHtml(profileData?.account_type || '—') + '</li>'
-      ].join('');
+      ];
+      if (profileData?.media_count != null) {
+        signalBits.push('<li><strong>Media count:</strong> ' + mbEscapeHtml(profileData.media_count) + '</li>');
+      }
+      signalBits.push('<li><strong>Recent posts pulled:</strong> ' + mbEscapeHtml(media.length) + '</li>');
+      signalsList.innerHTML = signalBits.join('');
     }
 
     if (movesList) {
-      movesList.innerHTML = [
-        '<li>Your Instagram login is connected, so MusixBlvd can now use the account identity returned by the API.</li>',
-        '<li>Next useful upgrade is pulling media info and any additional fields your app is allowed to access.</li>',
-        '<li>After that, MIKEY can turn the Instagram data into advice directly on this page.</li>'
-      ].join('');
+      const moveBits = [
+        '<li>Instagram is connected, and MusixBlvd can now identify the account and read the first set of profile fields returned by the API.</li>',
+        '<li>Recent media is now being pulled so MIKEY can react to what is actually on the page instead of only showing a connection message.</li>'
+      ];
+      if (media.length) {
+        const latest = media[0];
+        moveBits.push('<li>Latest pulled post type: <strong>' + mbEscapeHtml(latest?.media_type || '—') + '</strong>' + (latest?.timestamp ? ' • posted ' + mbEscapeHtml(latest.timestamp) : '') + '</li>');
+      } else {
+        moveBits.push('<li>No recent media came back yet, so the next check is whether the account has recent content available through the API.</li>');
+      }
+      movesList.innerHTML = moveBits.join('');
     }
 
     if (planBox) {
-      planBox.textContent =
-`Instagram connected successfully.
-Username: ${profileData?.username || '—'}
-User ID: ${profileData?.user_id || '—'}
-Account type: ${profileData?.account_type || '—'}
-
-Next step:
-Pull more Instagram fields and whatever stats your app is allowed to read.`;
+      const lines = [
+        'Instagram connected successfully.',
+        'Username: ' + (profileData?.username || '—'),
+        'User ID: ' + (profileData?.user_id || '—'),
+        'Account type: ' + (profileData?.account_type || '—')
+      ];
+      if (profileData?.media_count != null) lines.push('Media count: ' + profileData.media_count);
+      lines.push('');
+      if (media.length) {
+        lines.push('Latest media pulled:');
+        media.slice(0, 3).forEach((item, idx) => {
+          const caption = mbShortText(item?.caption || '', 90) || 'No caption';
+          lines.push((idx + 1) + '. ' + (item?.media_type || 'POST') + ' — ' + caption);
+        });
+      } else {
+        lines.push('No recent media returned yet.');
+      }
+      lines.push('', 'Next step:', 'Turn recent media and captions into MIKEY advice directly on this page.');
+      planBox.textContent = lines.join('
+');
     }
 
     if (proInsightsBox) {
-      proInsightsBox.innerHTML =
-        '<div style="padding:10px 12px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;color:#1d4ed8;font-weight:700;line-height:1.5;">' +
-        'Instagram connected. First profile data was returned from your backend. The next upgrade is requesting more allowed Instagram fields and then turning them into MIKEY advice.' +
-        '</div>';
+      if (media.length) {
+        const cards = media.slice(0, 6).map((item, idx) => {
+          const link = item?.permalink ? '<a href="' + mbEscapeHtml(item.permalink) + '" target="_blank" rel="noopener noreferrer" style="font-size:12px;font-weight:800;color:#2563eb;text-decoration:none;">Open post ↗</a>' : '';
+          const caption = mbShortText(item?.caption || '', 120) || 'No caption on this post.';
+          const when = item?.timestamp ? '<div style="font-size:12px;color:#64748b;margin-top:6px;">' + mbEscapeHtml(item.timestamp) + '</div>' : '';
+          return '<div style="border:1px solid #dbeafe;border-radius:14px;padding:12px;background:#ffffff;">' +
+            '<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">' +
+              '<div><div style="font-weight:800;color:#0f172a;">Post ' + (idx + 1) + ' • ' + mbEscapeHtml(item?.media_type || 'MEDIA') + '</div>' + when + '</div>' +
+              link +
+            '</div>' +
+            '<div style="margin-top:10px;font-size:13px;line-height:1.55;color:#334155;">' + mbEscapeHtml(caption) + '</div>' +
+          '</div>';
+        }).join('');
+
+        proInsightsBox.innerHTML =
+          '<div style="padding:12px;border:1px solid #bfdbfe;border-radius:14px;background:#eff6ff;color:#1d4ed8;font-weight:700;line-height:1.5;margin-bottom:10px;">' +
+          'Instagram connected. MusixBlvd pulled your profile plus recent media, so MIKEY now has actual content to work from.' +
+          '</div>' +
+          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">' + cards + '</div>';
+      } else {
+        proInsightsBox.innerHTML =
+          '<div style="padding:10px 12px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;color:#1d4ed8;font-weight:700;line-height:1.5;">' +
+          'Instagram connected, but no recent media came back yet. The account identity is working, so the next thing to check is whether the account has eligible recent posts available through the API.' +
+          '</div>';
+      }
     }
   }
 
@@ -8809,13 +8874,21 @@ Pull more Instagram fields and whatever stats your app is allowed to read.`;
       mbShowInstagramStatus('Instagram token received. Pulling first profile data...', true);
 
       const profileData = await mbFetchInstagramProfile(accessToken);
+      let mediaItems = [];
+      try {
+        const mediaData = await mbFetchInstagramMedia(accessToken);
+        mediaItems = Array.isArray(mediaData?.data) ? mediaData.data : [];
+        try { localStorage.setItem('mb_instagram_media', JSON.stringify(mediaItems)); } catch (e) {}
+      } catch (mediaErr) {
+        console.warn('Instagram media fetch skipped:', mediaErr);
+      }
       try { localStorage.setItem('mb_instagram_profile', JSON.stringify(profileData)); } catch (e) {}
 
       mbPersistInstagramConnection(profileData);
       mbSetInstagramActive(true);
-      mbRenderInstagramProfile(profileData);
+      mbRenderInstagramProfile(profileData, mediaItems);
       mbShowInstagramStatus(
-        'Instagram connected. Username: <strong>' + mbEscapeHtml(profileData?.username || '—') + '</strong> • Account type: <strong>' + mbEscapeHtml(profileData?.account_type || '—') + '</strong>',
+        'Instagram connected. Username: <strong>' + mbEscapeHtml(profileData?.username || '—') + '</strong> • Account type: <strong>' + mbEscapeHtml(profileData?.account_type || '—') + '</strong>' + (mediaItems.length ? ' • Recent posts pulled: <strong>' + mediaItems.length + '</strong>' : ''),
         true
       );
     } catch (error) {
