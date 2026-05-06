@@ -8748,7 +8748,100 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     return data;
   }
 
-  function mbRenderInstagramProfile(profileData) {
+  async function mbFetchInstagramMedia(accessToken) {
+    const resp = await fetch('/api/instagram/media', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ access_token: accessToken })
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      throw new Error(data?.error_message || data?.error || 'Instagram media fetch failed.');
+    }
+    return data;
+  }
+
+  async function mbFetchInstagramInsights(accessToken, userId) {
+    const resp = await fetch('/api/instagram/insights', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ access_token: accessToken, user_id: String(userId || '') })
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      return { error: data?.error_message || data?.error || 'Instagram insights are not available yet.' };
+    }
+    return data;
+  }
+
+  function mbFormatNumber(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '—';
+    return n.toLocaleString();
+  }
+
+  function mbNormalizeInsights(data) {
+    const items = Array.isArray(data?.data) ? data.data : [];
+    return items.map((item) => {
+      const metric = item?.name || 'metric';
+      let value = item?.total_value?.value;
+      if (value == null && Array.isArray(item?.values) && item.values.length) {
+        value = item.values[0]?.value;
+      }
+      if (value && typeof value === 'object' && 'value' in value) {
+        value = value.value;
+      }
+      return { metric, value };
+    }).filter((x) => x.metric);
+  }
+
+  function mbMetricLabel(metric) {
+    const labels = {
+      accounts_engaged: 'Accounts engaged',
+      accounts_reached: 'Accounts reached',
+      total_interactions: 'Total interactions',
+      likes: 'Likes',
+      comments: 'Comments',
+      saves: 'Saves',
+      shares: 'Shares',
+      views: 'Views',
+      follows_and_unfollows: 'Follows / unfollows'
+    };
+    return labels[metric] || metric.replace(/_/g, ' ');
+  }
+
+  function mbRenderInstagramMedia(mediaData) {
+    const proInsightsBox = document.getElementById('proInsightsBox');
+    const items = Array.isArray(mediaData?.data) ? mediaData.data : [];
+    if (!proInsightsBox) return;
+
+    if (!items.length) {
+      proInsightsBox.innerHTML =
+        '<div style="padding:10px 12px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;color:#1d4ed8;font-weight:700;line-height:1.5;">Instagram is connected, but no recent media was returned yet.</div>';
+      return;
+    }
+
+    const cards = items.map((item) => {
+      const thumb = item?.media_url || item?.thumbnail_url || '';
+      const caption = mbEscapeHtml((item?.caption || '').slice(0, 120) || 'No caption');
+      const type = mbEscapeHtml(item?.media_type || 'POST');
+      const link = item?.permalink ? '<a href="' + mbEscapeHtml(item.permalink) + '" target="_blank" rel="noopener" style="color:#0e7fd4;font-weight:700;text-decoration:none;">Open post ↗</a>' : '';
+      const img = thumb
+        ? '<img src="' + mbEscapeHtml(thumb) + '" alt="Instagram media" style="width:100%;height:140px;object-fit:cover;border-radius:12px;border:1px solid #dbeafe;margin-bottom:8px" />'
+        : '';
+      return '<div style="border:1px solid #dbeafe;border-radius:14px;padding:10px;background:#fff;box-shadow:0 8px 18px rgba(14,127,212,.08)">' + img +
+        '<div style="font-size:12px;font-weight:800;color:#0e7fd4;margin-bottom:6px">' + type + '</div>' +
+        '<div style="font-size:13px;line-height:1.5;color:#0f172a;margin-bottom:8px">' + caption + '</div>' +
+        '<div style="font-size:12px;color:#64748b">' + link + '</div>' +
+      '</div>';
+    }).join('');
+
+    proInsightsBox.innerHTML =
+      '<div style="margin-bottom:10px;padding:10px 12px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;color:#1d4ed8;font-weight:800;line-height:1.5;">Recent Instagram content snapshot</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">' + cards + '</div>';
+  }
+
+  function mbRenderInstagramProfile(profileData, insightsData) {
     const results = document.getElementById('aiResults');
     const signalsList = document.getElementById('signalsList');
     const movesList = document.getElementById('movesList');
@@ -8757,72 +8850,106 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
 
     if (results) results.classList.remove('hidden');
 
-    if (signalsList) {
-      signalsList.innerHTML = [
-        '<li><strong>Instagram username:</strong> ' + mbEscapeHtml(profileData?.username || '—') + '</li>',
-        '<li><strong>Instagram user ID:</strong> ' + mbEscapeHtml(profileData?.user_id || '—') + '</li>',
-        '<li><strong>Account type:</strong> ' + mbEscapeHtml(profileData?.account_type || '—') + '</li>'
-      ].join('');
+    const insights = mbNormalizeInsights(insightsData);
+    const insightMap = Object.fromEntries(insights.map((x) => [x.metric, x.value]));
+
+    const signalRows = [
+      '<li><strong>Instagram username:</strong> ' + mbEscapeHtml(profileData?.username || '—') + '</li>',
+      '<li><strong>Instagram user ID:</strong> ' + mbEscapeHtml(profileData?.user_id || '—') + '</li>',
+      '<li><strong>Account type:</strong> ' + mbEscapeHtml(profileData?.account_type || '—') + '</li>'
+    ];
+
+    if (profileData?.followers_count != null) {
+      signalRows.push('<li><strong>Followers:</strong> ' + mbEscapeHtml(mbFormatNumber(profileData.followers_count)) + '</li>');
+    }
+    if (profileData?.follows_count != null) {
+      signalRows.push('<li><strong>Following:</strong> ' + mbEscapeHtml(mbFormatNumber(profileData.follows_count)) + '</li>');
+    }
+    if (profileData?.media_count != null) {
+      signalRows.push('<li><strong>Media count:</strong> ' + mbEscapeHtml(mbFormatNumber(profileData.media_count)) + '</li>');
+    }
+    if (profileData?.website) {
+      signalRows.push('<li><strong>Website:</strong> ' + mbEscapeHtml(profileData.website) + '</li>');
+    }
+    if (profileData?.biography) {
+      signalRows.push('<li><strong>Bio:</strong> ' + mbEscapeHtml(profileData.biography) + '</li>');
+    }
+    if (insightMap.accounts_reached != null) {
+      signalRows.push('<li><strong>Accounts reached:</strong> ' + mbEscapeHtml(mbFormatNumber(insightMap.accounts_reached)) + '</li>');
+    }
+    if (insightMap.accounts_engaged != null) {
+      signalRows.push('<li><strong>Accounts engaged:</strong> ' + mbEscapeHtml(mbFormatNumber(insightMap.accounts_engaged)) + '</li>');
+    }
+    if (insightMap.total_interactions != null) {
+      signalRows.push('<li><strong>Total interactions:</strong> ' + mbEscapeHtml(mbFormatNumber(insightMap.total_interactions)) + '</li>');
+    }
+
+    if (signalsList) signalsList.innerHTML = signalRows.join('');
+
+    const moves = [];
+    if ((profileData?.followers_count || 0) > 0 && (insightMap.accounts_engaged || 0) > 0) {
+      const rate = Number(insightMap.accounts_engaged) / Number(profileData.followers_count);
+      if (Number.isFinite(rate)) {
+        if (rate < 0.05) moves.push('Engagement looks soft compared with follower size. Push stronger hooks, direct CTAs, and more comment-driven captions this week.');
+        else if (rate < 0.15) moves.push('Engagement is moving. Keep posting consistently and test more shareable or saveable content to lift the next tier.');
+        else moves.push('Engagement looks healthy. Double down on the formats that are already getting people to interact.');
+      }
+    } else {
+      moves.push('Instagram is connected. Start building your baseline so MIKEY can compare future changes week to week.');
+    }
+
+    if ((profileData?.media_count || 0) < 12) {
+      moves.push('Your total media count still looks early. Focus on consistent posting so the account builds more surface area for discovery.');
+    } else {
+      moves.push('You have enough content to start spotting what style is getting the best response. Reuse the strongest format more often.');
+    }
+
+    if (insightMap.accounts_reached != null && insightMap.accounts_engaged != null && Number(insightMap.accounts_reached) > 0) {
+      const reachToEngage = Number(insightMap.accounts_engaged) / Number(insightMap.accounts_reached);
+      if (Number.isFinite(reachToEngage) && reachToEngage < 0.1) {
+        moves.push('Reach is coming in, but not enough people are engaging. Tighten captions and make the first second of your content stronger.');
+      }
     }
 
     if (movesList) {
-      movesList.innerHTML = [
-        '<li>Your Instagram login is connected, so MusixBlvd can now use the account identity returned by the API.</li>',
-        '<li>Next useful upgrade is pulling media info and any additional fields your app is allowed to access.</li>',
-        '<li>After that, MIKEY can turn the Instagram data into advice directly on this page.</li>'
-      ].join('');
+      movesList.innerHTML = moves.map((x) => '<li>' + mbEscapeHtml(x) + '</li>').join('');
+    }
+
+    const plan = [
+      'Instagram: post 3 Reels, 1 carousel, and daily Stories this week.',
+      'Use one CTA on every post: comment, save, share, or DM.',
+      'Turn your best recent content into a repeatable series instead of random one-offs.'
+    ];
+
+    if (profileData?.followers_count != null) {
+      plan.unshift('Current follower count: ' + mbFormatNumber(profileData.followers_count) + '. Use that as your baseline for the next check-in.');
+    }
+    if (insightMap.accounts_reached != null) {
+      plan.push('Current reach baseline: ' + mbFormatNumber(insightMap.accounts_reached) + '. Try to beat it with your next batch of posts.');
     }
 
     if (planBox) {
-      planBox.textContent =
-`Instagram connected successfully.
-Username: ${profileData?.username || '—'}
-User ID: ${profileData?.user_id || '—'}
-Account type: ${profileData?.account_type || '—'}
-
-Next step:
-Pull more Instagram fields and whatever stats your app is allowed to read.`;
+      planBox.textContent = plan.join('\n');
     }
 
     if (proInsightsBox) {
-      proInsightsBox.innerHTML =
-        '<div style="padding:10px 12px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;color:#1d4ed8;font-weight:700;line-height:1.5;">' +
-        'Instagram connected. First profile data was returned from your backend. The next upgrade is requesting more allowed Instagram fields and then turning them into MIKEY advice.' +
-        '</div>';
+      if (insights.length) {
+        proInsightsBox.innerHTML =
+          '<div style="padding:10px 12px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;color:#1d4ed8;font-weight:800;line-height:1.5;margin-bottom:10px;">Instagram performance snapshot</div>' +
+          insights.map((item) =>
+            '<div style="margin:6px 0;padding:10px 12px;border:1px solid #dbeafe;border-radius:12px;background:#fff;color:#0f172a;display:flex;justify-content:space-between;gap:10px;">' +
+              '<span style="font-weight:700">' + mbEscapeHtml(mbMetricLabel(item.metric)) + '</span>' +
+              '<span>' + mbEscapeHtml(mbFormatNumber(item.value)) + '</span>' +
+            '</div>'
+          ).join('');
+      } else {
+        proInsightsBox.innerHTML =
+          '<div style="padding:10px 12px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;color:#1d4ed8;font-weight:700;line-height:1.5;">Instagram is connected. More advanced insight metrics are not coming back yet, so MIKEY is using the profile data and posting baseline for advice.</div>';
+      }
     }
   }
 
   async function mbHandleInstagramCallback(code) {
-    mbShowInstagramStatus('Instagram login connected. Exchanging code with your backend...', true);
-    try {
-      const tokenData = await mbExchangeInstagramCode(code);
-      const accessToken = tokenData?.access_token;
-      if (!accessToken) {
-        throw new Error('Instagram did not return an access token.');
-      }
-
-      try { localStorage.setItem('mb_instagram_access_token', accessToken); } catch (e) {}
-      if (tokenData?.user_id) {
-        try { localStorage.setItem('mb_instagram_user_id', String(tokenData.user_id)); } catch (e) {}
-      }
-
-      mbShowInstagramStatus('Instagram token received. Pulling first profile data...', true);
-
-      const profileData = await mbFetchInstagramProfile(accessToken);
-      try { localStorage.setItem('mb_instagram_profile', JSON.stringify(profileData)); } catch (e) {}
-
-      mbPersistInstagramConnection(profileData);
-      mbSetInstagramActive(true);
-      mbRenderInstagramProfile(profileData);
-      mbShowInstagramStatus(
-        'Instagram connected. Username: <strong>' + mbEscapeHtml(profileData?.username || '—') + '</strong> • Account type: <strong>' + mbEscapeHtml(profileData?.account_type || '—') + '</strong>',
-        true
-      );
-    } catch (error) {
-      console.error('Instagram callback handling failed:', error);
-      mbShowInstagramStatus('Instagram connected to the login flow, but MusixBlvd could not finish the backend step: ' + mbEscapeHtml(error?.message || 'Unknown error.'), false);
-    }
-  }
 
   document.addEventListener('click', function (e) {
     const igBtn = e.target.closest('#ai .providers .prov[data-p="instagram"], #igToggle');
