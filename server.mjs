@@ -121,7 +121,13 @@ app.post('/api/instagram/exchange-code', async (req, res) => {
     }
 
     if (!INSTAGRAM_APP_SECRET) {
-      return res.status(500).json({ error: 'Missing INSTAGRAM_APP_SECRET in your .env file.' });
+      return res.status(500).json({
+        error: 'Missing INSTAGRAM_APP_SECRET in your .env file.',
+        debug: {
+          hasInstagramAppId: !!process.env.INSTAGRAM_APP_ID,
+          hasInstagramAppSecret: !!process.env.INSTAGRAM_APP_SECRET
+        }
+      });
     }
 
     const form = new URLSearchParams();
@@ -160,7 +166,7 @@ app.post('/api/instagram/profile', async (req, res) => {
     }
 
     const profileUrl = new URL('https://graph.instagram.com/me');
-    profileUrl.searchParams.set('fields', 'user_id,username,account_type');
+    profileUrl.searchParams.set('fields', 'user_id,username,account_type,media_count');
     profileUrl.searchParams.set('access_token', accessToken);
 
     const profileResp = await fetch(profileUrl.toString());
@@ -175,6 +181,34 @@ app.post('/api/instagram/profile', async (req, res) => {
   } catch (error) {
     console.error('Instagram profile fetch error:', error);
     return res.status(500).json({ error: 'Instagram profile fetch failed.' });
+  }
+});
+
+app.post('/api/instagram/media', async (req, res) => {
+  try {
+    const accessToken = typeof req.body?.access_token === 'string' ? req.body.access_token.trim() : '';
+
+    if (!accessToken) {
+      return res.status(400).json({ error: 'Missing Instagram access token.' });
+    }
+
+    const mediaUrl = new URL('https://graph.instagram.com/me/media');
+    mediaUrl.searchParams.set('fields', 'id,caption,media_type,permalink,timestamp,media_url,thumbnail_url');
+    mediaUrl.searchParams.set('limit', '6');
+    mediaUrl.searchParams.set('access_token', accessToken);
+
+    const mediaResp = await fetch(mediaUrl.toString());
+    const mediaData = await mediaResp.json();
+
+    if (!mediaResp.ok) {
+      console.error('Instagram media error:', mediaData);
+      return res.status(mediaResp.status).json(mediaData);
+    }
+
+    return res.json(mediaData);
+  } catch (error) {
+    console.error('Instagram media fetch error:', error);
+    return res.status(500).json({ error: 'Instagram media fetch failed.' });
   }
 });
 
