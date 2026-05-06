@@ -160,7 +160,21 @@ app.post('/api/instagram/profile', async (req, res) => {
     }
 
     const profileUrl = new URL('https://graph.instagram.com/me');
-    profileUrl.searchParams.set('fields', 'user_id,username,account_type');
+    profileUrl.searchParams.set(
+      'fields',
+      [
+        'user_id',
+        'username',
+        'account_type',
+        'media_count',
+        'biography',
+        'website',
+        'name',
+        'profile_picture_url',
+        'followers_count',
+        'follows_count'
+      ].join(',')
+    );
     profileUrl.searchParams.set('access_token', accessToken);
 
     const profileResp = await fetch(profileUrl.toString());
@@ -175,6 +189,74 @@ app.post('/api/instagram/profile', async (req, res) => {
   } catch (error) {
     console.error('Instagram profile fetch error:', error);
     return res.status(500).json({ error: 'Instagram profile fetch failed.' });
+  }
+});
+
+app.post('/api/instagram/media', async (req, res) => {
+  try {
+    const accessToken = typeof req.body?.access_token === 'string' ? req.body.access_token.trim() : '';
+
+    if (!accessToken) {
+      return res.status(400).json({ error: 'Missing Instagram access token.' });
+    }
+
+    const mediaUrl = new URL('https://graph.instagram.com/me/media');
+    mediaUrl.searchParams.set(
+      'fields',
+      'id,caption,media_type,media_product_type,permalink,timestamp,media_url,thumbnail_url'
+    );
+    mediaUrl.searchParams.set('limit', '6');
+    mediaUrl.searchParams.set('access_token', accessToken);
+
+    const mediaResp = await fetch(mediaUrl.toString());
+    const mediaData = await mediaResp.json();
+
+    if (!mediaResp.ok) {
+      console.error('Instagram media error:', mediaData);
+      return res.status(mediaResp.status).json(mediaData);
+    }
+
+    return res.json(mediaData);
+  } catch (error) {
+    console.error('Instagram media fetch error:', error);
+    return res.status(500).json({ error: 'Instagram media fetch failed.' });
+  }
+});
+
+app.post('/api/instagram/insights', async (req, res) => {
+  try {
+    const accessToken = typeof req.body?.access_token === 'string' ? req.body.access_token.trim() : '';
+    const userId = typeof req.body?.user_id === 'string' ? req.body.user_id.trim() : '';
+
+    if (!accessToken) {
+      return res.status(400).json({ error: 'Missing Instagram access token.' });
+    }
+
+    if (!userId) {
+      return res.status(400).json({ error: 'Missing Instagram user ID.' });
+    }
+
+    const insightsUrl = new URL(`https://graph.instagram.com/${encodeURIComponent(userId)}/insights`);
+    insightsUrl.searchParams.set(
+      'metric',
+      'accounts_engaged,accounts_reached,total_interactions,likes,comments,saves,shares,views,follows_and_unfollows'
+    );
+    insightsUrl.searchParams.set('period', 'day');
+    insightsUrl.searchParams.set('metric_type', 'total_value');
+    insightsUrl.searchParams.set('access_token', accessToken);
+
+    const insightsResp = await fetch(insightsUrl.toString());
+    const insightsData = await insightsResp.json();
+
+    if (!insightsResp.ok) {
+      console.error('Instagram insights error:', insightsData);
+      return res.status(insightsResp.status).json(insightsData);
+    }
+
+    return res.json(insightsData);
+  } catch (error) {
+    console.error('Instagram insights fetch error:', error);
+    return res.status(500).json({ error: 'Instagram insights fetch failed.' });
   }
 });
 
