@@ -1336,7 +1336,122 @@
 #dirGrid .mb-unified-card [data-unified-request]{position:relative;z-index:5;pointer-events:auto;}
 #dirGrid .mb-unified-card .dir-main,
 #dirGrid .mb-unified-card .dir-actions{position:relative;z-index:4;}
-</style></head>
+</style>
+
+<!-- ===== Instagram/Mikey result TEXT polish only — keeps the same boxes + layout ===== -->
+<style id="mb-instagram-results-text-polish-only">
+  /* Keep the existing results format. This only improves the returned text readability. */
+  #aiResults .panel-card h3{
+    margin-bottom:10px;
+    font-size:18px;
+    line-height:1.25;
+    font-weight:900;
+    letter-spacing:-.02em;
+    color:#0f172a;
+  }
+
+  #aiResults .signals,
+  #aiResults .bullets{
+    margin:10px 0 0;
+    padding-left:0;
+    list-style:none;
+  }
+
+  #aiResults .signals li,
+  #aiResults .bullets li{
+    position:relative;
+    margin:8px 0;
+    padding:10px 12px 10px 36px;
+    border:1px solid rgba(226,232,240,.95);
+    border-radius:12px;
+    background:linear-gradient(180deg, rgba(255,255,255,.96), rgba(248,250,252,.9));
+    color:#334155;
+    font-size:14px;
+    line-height:1.55;
+    box-shadow:0 6px 16px rgba(15,23,42,.04);
+  }
+
+  #aiResults .signals li::before,
+  #aiResults .bullets li::before{
+    content:"✓";
+    position:absolute;
+    left:12px;
+    top:10px;
+    width:17px;
+    height:17px;
+    border-radius:999px;
+    display:grid;
+    place-items:center;
+    background:rgba(26,163,255,.12);
+    color:var(--mb-blue-2);
+    font-size:11px;
+    font-weight:900;
+  }
+
+  #aiResults strong{
+    color:#0f172a;
+    font-weight:900;
+  }
+
+  #aiResults a{
+    color:var(--mb-blue-2);
+    font-weight:800;
+    text-decoration:none;
+    border-bottom:1px solid rgba(14,127,212,.28);
+  }
+
+  #aiResults a:hover{
+    border-bottom-color:var(--mb-blue-2);
+  }
+
+  #aiResults .plan-box{
+    margin-top:10px;
+    white-space:pre-wrap;
+    overflow:auto;
+    padding:14px;
+    border:1px solid rgba(226,232,240,.95);
+    border-radius:14px;
+    background:linear-gradient(180deg, #0f172a, #1e293b);
+    color:#e2e8f0;
+    font-family:Poppins, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    font-size:13px;
+    line-height:1.7;
+    box-shadow:0 10px 22px rgba(15,23,42,.12);
+  }
+
+  #manualAdviceBox,
+  #proInsightsBox{
+    color:#334155;
+    font-size:14px;
+    line-height:1.65;
+  }
+
+  #manualAdviceBox ul,
+  #proInsightsBox ul{
+    margin:10px 0 0;
+    padding-left:0;
+    list-style:none;
+  }
+
+  #manualAdviceBox li,
+  #proInsightsBox li{
+    margin:8px 0;
+    padding:10px 12px;
+    border-radius:12px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+  }
+
+  @media (max-width:740px){
+    #aiResults .signals li,
+    #aiResults .bullets li{
+      font-size:13px;
+      padding-right:10px;
+    }
+  }
+</style>
+
+</head>
 <body>
 <header class="topbar">
 <div class="brand">
@@ -3945,26 +4060,6 @@ const MB_API_ENDPOINTS = {
     window.mbRenderManualAdvice?.();
   }
 
-  async function pullConnectedApiStatsForAnalysis() {
-    const p = normalizeProfile(loadProfile());
-    const activeKeys = provBtns
-      .filter((btn) => btn.classList.contains('active'))
-      .map((btn) => String(btn.dataset.p || btn.getAttribute('data-p') || '').trim().toLowerCase());
-
-    const jobs = [];
-
-    if (activeKeys.includes('instagram') && p.socialConnected?.ig && p.socials?.ig) {
-      jobs.push(enrichPlatformFromAPI('instagram', p.socials.ig));
-    }
-
-    if (activeKeys.includes('tiktok') && p.socialConnected?.tt && p.socials?.tt) {
-      jobs.push(enrichPlatformFromAPI('tiktok', p.socials.tt));
-    }
-
-    if (!jobs.length) return;
-    await Promise.allSettled(jobs);
-  }
-
   start?.addEventListener('click', (e) => {
     e.preventDefault();
     if (!agree?.checked) {
@@ -3980,10 +4075,10 @@ const MB_API_ENDPOINTS = {
     talk(true);
 
     setTimeout(async () => {
-      await pullConnectedApiStatsForAnalysis();
       closeModal(modal);
       talk(false);
       showResults();
+      window.mbRenderSavedInstagramResults?.();
       await enhanceMikeyResultsWithAI();
     }, 1100);
   });
@@ -4516,9 +4611,13 @@ const MB_API_ENDPOINTS = {
 
     saveProfile(p);
 
-    // Connection only saves the account.
-    // Do NOT pull API stats or reveal MIKEY results here.
-    // The Analyze my socials button is the only place that runs Instagram/TikTok analysis.
+    if (current.kind === 'social' && (current.key === 'instagram' || current.key === 'tiktok')) {
+      enrichPlatformFromAPI(current.key, val).then((apiStats) => {
+        if (apiStats && connectHintEl) {
+          connectHintEl.textContent = `${current.label} API stats loaded into Weekly Stats.`;
+        }
+      });
+    }
 
     document.querySelectorAll('#ai .providers .prov[data-p]').forEach((btn) => {
       const raw = btn.dataset.p || btn.getAttribute('data-p') || btn.textContent;
@@ -4539,8 +4638,11 @@ const MB_API_ENDPOINTS = {
     window.mbRenderProfileViews?.();
     closeModal(connectModal);
 
-    // Do not open weekly stats or results automatically after connecting.
-    // Users can click Analyze my socials when they are ready.
+    if (manualModal && (current.kind === 'social' || ['spotify', 'soundcloud', 'apple'].includes(current.key))) {
+      setTimeout(() => {
+        openManualStatsFor(current.key, current);
+      }, 120);
+    }
 
     window.mbRenderManualAdvice?.();
     window.mbSyncAnalyzeButton?.();
@@ -8694,10 +8796,12 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
   }
 
   function mbShowInstagramStatus(msg, ok) {
-    const results = document.getElementById('aiResults');
+    // IMPORTANT: connecting Instagram should NOT reveal the results area.
+    // Results are only shown after the user clicks "Analyze my socials".
+    try { localStorage.setItem('mb_instagram_status_html', msg); } catch (e) {}
     const box = document.getElementById('manualAdviceBox');
-    if (results) results.classList.remove('hidden');
-    if (box) {
+    const results = document.getElementById('aiResults');
+    if (box && results && !results.classList.contains('hidden')) {
       box.innerHTML = '<div style="padding:10px 12px;border:1px solid ' + (ok ? '#bbf7d0' : '#fecaca') + ';border-radius:12px;background:' + (ok ? '#ecfdf3' : '#fef2f2') + ';color:' + (ok ? '#166534' : '#b91c1c') + ';font-weight:700;line-height:1.5;">' + msg + '</div>';
     }
   }
@@ -8800,14 +8904,14 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     return '—';
   }
 
-  function mbRenderInstagramProfile(profileData, mediaData, insightsData) {
+  function mbRenderInstagramProfile(profileData, mediaData, insightsData, revealResults = true) {
     const results = document.getElementById('aiResults');
     const signalsList = document.getElementById('signalsList');
     const movesList = document.getElementById('movesList');
     const planBox = document.getElementById('planBox');
     const proInsightsBox = document.getElementById('proInsightsBox');
 
-    if (results) results.classList.remove('hidden');
+    if (results && revealResults) results.classList.remove('hidden');
 
     const mediaItems = Array.isArray(mediaData?.data) ? mediaData.data : [];
     const insightItems = Array.isArray(insightsData?.data) ? insightsData.data : [];
@@ -8907,6 +9011,23 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     }
   }
 
+  window.mbRenderSavedInstagramResults = function () {
+    try {
+      const profileData = JSON.parse(localStorage.getItem('mb_instagram_profile') || 'null');
+      if (!profileData || !profileData.username) return false;
+      const mediaData = JSON.parse(localStorage.getItem('mb_instagram_media') || 'null');
+      const insightsData = JSON.parse(localStorage.getItem('mb_instagram_insights') || 'null');
+      mbRenderInstagramProfile(profileData, mediaData, insightsData, true);
+      return true;
+    } catch (e) {
+      console.warn('Could not render saved Instagram results', e);
+      return false;
+    }
+  };
+
+  window.mbRenderInstagramProfile = mbRenderInstagramProfile;
+
+
   async function mbHandleInstagramCallback(code) {
     mbShowInstagramStatus('Instagram login connected. Exchanging code with your backend...', true);
     try {
@@ -8934,7 +9055,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
 
       mbPersistInstagramConnection(profileData);
       mbSetInstagramActive(true);
-      mbRenderInstagramProfile(profileData, mediaData, insightsData);
+      // Save Instagram data only. Do not render results until Analyze my socials is clicked.
       mbShowInstagramStatus(
         'Instagram connected. Username: <strong>' + mbEscapeHtml(profileData?.username || '—') + '</strong> • Followers: <strong>' + mbEscapeHtml(typeof profileData?.followers_count === 'undefined' ? '—' : profileData.followers_count) + '</strong> • Account type: <strong>' + mbEscapeHtml(profileData?.account_type || '—') + '</strong>',
         true
