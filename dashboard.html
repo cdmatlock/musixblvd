@@ -8684,96 +8684,144 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     const box = document.getElementById('manualAdviceBox');
     if (results) results.classList.remove('hidden');
     if (box) {
-      box.innerHTML = '<div style="padding:10px 12px;border:1px solid ' + (ok ? '#bbf7d0' : '#fecaca') + ';border-radius:12px;background:' + (ok ? '#ecfdf3' : '#fef2f2') + ';color:' + (ok ? '#166534' : '#b91c1c') + ';font-weight:700;">' + msg + '</div>';
+      box.innerHTML = '<div style="padding:10px 12px;border:1px solid ' + (ok ? '#bbf7d0' : '#fecaca') + ';border-radius:12px;background:' + (ok ? '#ecfdf3' : '#fef2f2') + ';color:' + (ok ? '#166534' : '#b91c1c') + ';font-weight:700;line-height:1.5;">' + msg + '</div>';
     }
   }
 
-  function mbShowInstagramProfile(data) {
-    const results = document.getElementById('aiResults');
-    const box = document.getElementById('manualAdviceBox');
-    const signals = document.getElementById('signalsList');
-    const moves = document.getElementById('movesList');
-    const plan = document.getElementById('planBox');
+  function mbEscapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
 
-    if (results) results.classList.remove('hidden');
+  function mbSetInstagramActive(isOn) {
+    const btn = document.querySelector('#ai .providers .prov[data-p="instagram"]');
+    if (btn) btn.classList.toggle('active', !!isOn);
+    const start = document.getElementById('startAnalysis');
+    const agree = document.getElementById('agree');
+    const anySel = !!document.querySelector('#ai .providers .prov.active');
+    if (start) start.disabled = !(agree?.checked && anySel);
+  }
 
-    const username = data?.username || '—';
-    const userId = data?.user_id || data?.id || '—';
-    const accountType = data?.account_type || '—';
-
-    if (box) {
-      box.innerHTML = `
-        <div style="padding:12px;border:1px solid #bbf7d0;border-radius:12px;background:#ecfdf3;color:#166534;">
-          <div style="font-weight:800;margin-bottom:6px;">Instagram connected</div>
-          <div><b>Username:</b> ${username}</div>
-          <div><b>User ID:</b> ${userId}</div>
-          <div><b>Account Type:</b> ${accountType}</div>
-        </div>
-      `;
-    }
-
-    if (signals) {
-      signals.innerHTML = `
-        <li><b>Instagram username:</b> ${username}</li>
-        <li><b>Instagram account type:</b> ${accountType}</li>
-        <li><b>Instagram user ID:</b> ${userId}</li>
-      `;
-    }
-
-    if (moves) {
-      moves.innerHTML = `
-        <li>Instagram login is connected to MusixBlvd.</li>
-        <li>Next step: expand the backend to pull media and any allowed insights.</li>
-      `;
-    }
-
-    if (plan) {
-      plan.textContent = [
-        'Instagram connection complete.',
-        'First profile fields loaded into MusixBlvd.',
-        'Next backend step: fetch media and any additional account data your app is allowed to read.'
-      ].join('\n');
+  function mbPersistInstagramConnection(profileData) {
+    try {
+      const profile = JSON.parse(localStorage.getItem('mb_profile') || '{}');
+      profile.socialConnected = profile.socialConnected || {};
+      profile.socialUrls = profile.socialUrls || {};
+      profile.socialConnected.ig = true;
+      if (profileData?.username) {
+        profile.socialUrls.instagram = 'https://instagram.com/' + profileData.username;
+      }
+      localStorage.setItem('mb_profile', JSON.stringify(profile));
+      document.dispatchEvent(new CustomEvent('mb:profile-updated', { detail: profile }));
+    } catch (e) {
+      console.warn('Could not persist Instagram connection', e);
     }
   }
 
-  async function mbExchangeInstagramCodeAndLoadProfile(code) {
-    mbShowInstagramStatus('Instagram login connected. Exchanging code for token...', true);
-
-    const exchangeResp = await fetch('/api/instagram/exchange-code', {
+  async function mbExchangeInstagramCode(code) {
+    const resp = await fetch('/api/instagram/exchange-code', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code })
     });
-
-    const exchangeData = await exchangeResp.json().catch(() => ({}));
-    if (!exchangeResp.ok) {
-      throw new Error(exchangeData?.error_message || exchangeData?.error || 'Instagram code exchange failed.');
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      throw new Error(data?.error_message || data?.error || 'Instagram token exchange failed.');
     }
+    return data;
+  }
 
-    const accessToken = exchangeData?.access_token;
-    if (!accessToken) {
-      throw new Error('Instagram access token was not returned.');
-    }
-
-    try {
-      localStorage.setItem('mb_instagram_access_token', accessToken);
-      localStorage.setItem('mb_connected_instagram', 'true');
-    } catch (e) {}
-
-    mbShowInstagramStatus('Instagram token received. Loading profile...', true);
-
-    const profileResp = await fetch('/api/instagram/profile', {
+  async function mbFetchInstagramProfile(accessToken) {
+    const resp = await fetch('/api/instagram/profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ access_token: accessToken })
     });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      throw new Error(data?.error_message || data?.error || 'Instagram profile fetch failed.');
+    }
+    return data;
+  }
 
-    const profileData = await profileResp.json().catch(() => ({}));
-    if (!profileResp.ok) {
-      throw new Error(profileData?.error_message || profileData?.error || 'Instagram profile fetch failed.');
+  function mbRenderInstagramProfile(profileData) {
+    const results = document.getElementById('aiResults');
+    const signalsList = document.getElementById('signalsList');
+    const movesList = document.getElementById('movesList');
+    const planBox = document.getElementById('planBox');
+    const proInsightsBox = document.getElementById('proInsightsBox');
+
+    if (results) results.classList.remove('hidden');
+
+    if (signalsList) {
+      signalsList.innerHTML = [
+        '<li><strong>Instagram username:</strong> ' + mbEscapeHtml(profileData?.username || '—') + '</li>',
+        '<li><strong>Instagram user ID:</strong> ' + mbEscapeHtml(profileData?.user_id || '—') + '</li>',
+        '<li><strong>Account type:</strong> ' + mbEscapeHtml(profileData?.account_type || '—') + '</li>'
+      ].join('');
     }
 
-    mbShowInstagramProfile(profileData);
+    if (movesList) {
+      movesList.innerHTML = [
+        '<li>Your Instagram login is connected, so MusixBlvd can now use the account identity returned by the API.</li>',
+        '<li>Next useful upgrade is pulling media info and any additional fields your app is allowed to access.</li>',
+        '<li>After that, MIKEY can turn the Instagram data into advice directly on this page.</li>'
+      ].join('');
+    }
+
+    if (planBox) {
+      planBox.textContent =
+`Instagram connected successfully.
+Username: ${profileData?.username || '—'}
+User ID: ${profileData?.user_id || '—'}
+Account type: ${profileData?.account_type || '—'}
+
+Next step:
+Pull more Instagram fields and whatever stats your app is allowed to read.`;
+    }
+
+    if (proInsightsBox) {
+      proInsightsBox.innerHTML =
+        '<div style="padding:10px 12px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;color:#1d4ed8;font-weight:700;line-height:1.5;">' +
+        'Instagram connected. First profile data was returned from your backend. The next upgrade is requesting more allowed Instagram fields and then turning them into MIKEY advice.' +
+        '</div>';
+    }
+  }
+
+  async function mbHandleInstagramCallback(code) {
+    mbShowInstagramStatus('Instagram login connected. Exchanging code with your backend...', true);
+    try {
+      const tokenData = await mbExchangeInstagramCode(code);
+      const accessToken = tokenData?.access_token;
+      if (!accessToken) {
+        throw new Error('Instagram did not return an access token.');
+      }
+
+      try { localStorage.setItem('mb_instagram_access_token', accessToken); } catch (e) {}
+      if (tokenData?.user_id) {
+        try { localStorage.setItem('mb_instagram_user_id', String(tokenData.user_id)); } catch (e) {}
+      }
+
+      mbShowInstagramStatus('Instagram token received. Pulling first profile data...', true);
+
+      const profileData = await mbFetchInstagramProfile(accessToken);
+      try { localStorage.setItem('mb_instagram_profile', JSON.stringify(profileData)); } catch (e) {}
+
+      mbPersistInstagramConnection(profileData);
+      mbSetInstagramActive(true);
+      mbRenderInstagramProfile(profileData);
+      mbShowInstagramStatus(
+        'Instagram connected. Username: <strong>' + mbEscapeHtml(profileData?.username || '—') + '</strong> • Account type: <strong>' + mbEscapeHtml(profileData?.account_type || '—') + '</strong>',
+        true
+      );
+    } catch (error) {
+      console.error('Instagram callback handling failed:', error);
+      mbShowInstagramStatus('Instagram connected to the login flow, but MusixBlvd could not finish the backend step: ' + mbEscapeHtml(error?.message || 'Unknown error.'), false);
+    }
   }
 
   document.addEventListener('click', function (e) {
@@ -8804,36 +8852,43 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
   }, true);
 
   try {
-    const url = new URL(window.location.href);
-    const code = url.searchParams.get('code');
-    const err = url.searchParams.get('error');
-    const errDesc = url.searchParams.get('error_description');
-
-    if (code) {
-      try { localStorage.setItem('mb_instagram_auth_code', code); } catch (e) {}
-      mbExchangeInstagramCodeAndLoadProfile(code).catch((exchangeError) => {
-        mbShowInstagramStatus('Instagram backend error: ' + (exchangeError?.message || exchangeError), false);
-      });
-
-      url.searchParams.delete('code');
-      url.searchParams.delete('state');
-      url.searchParams.delete('error');
-      url.searchParams.delete('error_reason');
-      url.searchParams.delete('error_description');
-      window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : '') + url.hash);
-    } else if (err) {
-      mbShowInstagramStatus('Instagram login error: ' + (errDesc || err), false);
-      url.searchParams.delete('error');
-      url.searchParams.delete('error_reason');
-      url.searchParams.delete('error_description');
-      url.searchParams.delete('state');
-      window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : '') + url.hash);
+    const savedProfile = JSON.parse(localStorage.getItem('mb_instagram_profile') || 'null');
+    if (savedProfile?.username) {
+      mbSetInstagramActive(true);
     }
-  } catch (e) {
-    console.warn('Instagram OAuth patch readback failed', e);
-  }
+  } catch (e) {}
+
+  (async function () {
+    try {
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get('code');
+      const err = url.searchParams.get('error');
+      const errDesc = url.searchParams.get('error_description');
+
+      if (code) {
+        try { localStorage.setItem('mb_instagram_auth_code', code); } catch (e) {}
+        await mbHandleInstagramCallback(code);
+        url.searchParams.delete('code');
+        url.searchParams.delete('state');
+        url.searchParams.delete('error');
+        url.searchParams.delete('error_reason');
+        url.searchParams.delete('error_description');
+        window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : '') + url.hash);
+      } else if (err) {
+        mbShowInstagramStatus('Instagram login error: ' + mbEscapeHtml(errDesc || err), false);
+        url.searchParams.delete('error');
+        url.searchParams.delete('error_reason');
+        url.searchParams.delete('error_description');
+        url.searchParams.delete('state');
+        window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : '') + url.hash);
+      }
+    } catch (e) {
+      console.warn('Instagram OAuth patch readback failed', e);
+    }
+  })();
 })();
 </script>
 
 </body>
 </html>
+
