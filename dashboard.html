@@ -8748,7 +8748,45 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     return data;
   }
 
-  function mbRenderInstagramProfile(profileData) {
+  async function mbFetchInstagramMedia(accessToken) {
+    const resp = await fetch('/api/instagram/media', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ access_token: accessToken })
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      console.warn('Instagram media fetch skipped:', data);
+      return null;
+    }
+    return data;
+  }
+
+  async function mbFetchInstagramInsights(accessToken, userId) {
+    if (!userId) return null;
+    const resp = await fetch('/api/instagram/insights', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ access_token: accessToken, user_id: String(userId) })
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      console.warn('Instagram insights fetch skipped:', data);
+      return null;
+    }
+    return data;
+  }
+
+  function mbFormatInsightValue(metric) {
+    if (!metric) return '—';
+    const tv = metric.total_value;
+    if (tv && typeof tv.value !== 'undefined') return String(tv.value);
+    const vals = Array.isArray(metric.values) ? metric.values : [];
+    if (vals.length && typeof vals[0]?.value !== 'undefined') return String(vals[0].value);
+    return '—';
+  }
+
+  function mbRenderInstagramProfile(profileData, mediaData, insightsData) {
     const results = document.getElementById('aiResults');
     const signalsList = document.getElementById('signalsList');
     const movesList = document.getElementById('movesList');
@@ -8757,37 +8795,100 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
 
     if (results) results.classList.remove('hidden');
 
+    const mediaItems = Array.isArray(mediaData?.data) ? mediaData.data : [];
+    const insightItems = Array.isArray(insightsData?.data) ? insightsData.data : [];
+    const insightMap = Object.fromEntries(insightItems.map((item) => [item?.name, item]));
+    const followers = profileData?.followers_count;
+    const following = profileData?.follows_count;
+    const mediaCount = profileData?.media_count;
+    const bio = profileData?.biography;
+    const website = profileData?.website;
+    const reach = mbFormatInsightValue(insightMap.accounts_reached);
+    const engaged = mbFormatInsightValue(insightMap.accounts_engaged);
+    const interactions = mbFormatInsightValue(insightMap.total_interactions);
+    const views = mbFormatInsightValue(insightMap.views);
+
     if (signalsList) {
-      signalsList.innerHTML = [
+      const rows = [
         '<li><strong>Instagram username:</strong> ' + mbEscapeHtml(profileData?.username || '—') + '</li>',
         '<li><strong>Instagram user ID:</strong> ' + mbEscapeHtml(profileData?.user_id || '—') + '</li>',
-        '<li><strong>Account type:</strong> ' + mbEscapeHtml(profileData?.account_type || '—') + '</li>'
-      ].join('');
+        '<li><strong>Account type:</strong> ' + mbEscapeHtml(profileData?.account_type || '—') + '</li>',
+        '<li><strong>Followers:</strong> ' + mbEscapeHtml(typeof followers === 'undefined' ? '—' : followers) + '</li>',
+        '<li><strong>Following:</strong> ' + mbEscapeHtml(typeof following === 'undefined' ? '—' : following) + '</li>',
+        '<li><strong>Media count:</strong> ' + mbEscapeHtml(typeof mediaCount === 'undefined' ? '—' : mediaCount) + '</li>',
+        '<li><strong>Accounts reached:</strong> ' + mbEscapeHtml(reach) + '</li>',
+        '<li><strong>Accounts engaged:</strong> ' + mbEscapeHtml(engaged) + '</li>',
+        '<li><strong>Total interactions:</strong> ' + mbEscapeHtml(interactions) + '</li>',
+        '<li><strong>Views:</strong> ' + mbEscapeHtml(views) + '</li>'
+      ];
+      if (bio) rows.push('<li><strong>Bio:</strong> ' + mbEscapeHtml(bio) + '</li>');
+      if (website) rows.push('<li><strong>Website:</strong> <a href="' + mbEscapeHtml(website) + '" target="_blank" rel="noopener">' + mbEscapeHtml(website) + '</a></li>');
+      signalsList.innerHTML = rows.join('');
     }
 
     if (movesList) {
-      movesList.innerHTML = [
-        '<li>Your Instagram login is connected, so MusixBlvd can now use the account identity returned by the API.</li>',
-        '<li>Next useful upgrade is pulling media info and any additional fields your app is allowed to access.</li>',
-        '<li>After that, MIKEY can turn the Instagram data into advice directly on this page.</li>'
-      ].join('');
+      const moves = [];
+      if (typeof followers !== 'undefined') {
+        moves.push('<li>Your follower count is <strong>' + mbEscapeHtml(followers) + '</strong>. Keep track of this week to week so MIKEY can spot growth or drop-offs.</li>');
+      } else {
+        moves.push('<li>Your Instagram login is connected, but follower count was not returned on this request.</li>');
+      }
+      if (typeof mediaCount !== 'undefined') {
+        moves.push('<li>You have <strong>' + mbEscapeHtml(mediaCount) + '</strong> published media items. Consistent posting usually matters more than random bursts.</li>');
+      }
+      if (reach !== '—' || engaged !== '—') {
+        moves.push('<li>Reach is <strong>' + mbEscapeHtml(reach) + '</strong> and engaged accounts are <strong>' + mbEscapeHtml(engaged) + '</strong>. That gives MIKEY something real to coach from.</li>');
+      } else {
+        moves.push('<li>Insights did not fully return yet, so the next best move is to compare followers, posting frequency, and recent content quality.</li>');
+      }
+      if (mediaItems.length) {
+        moves.push('<li>MusixBlvd pulled recent Instagram media, so we can start turning actual posts into feedback and content advice.</li>');
+      }
+      movesList.innerHTML = moves.join('');
     }
 
     if (planBox) {
-      planBox.textContent =
-`Instagram connected successfully.
-Username: ${profileData?.username || '—'}
-User ID: ${profileData?.user_id || '—'}
-Account type: ${profileData?.account_type || '—'}
-
-Next step:
-Pull more Instagram fields and whatever stats your app is allowed to read.`;
+      const lines = [
+        'Instagram connected successfully.',
+        'Username: ' + (profileData?.username || '—'),
+        'User ID: ' + (profileData?.user_id || '—'),
+        'Account type: ' + (profileData?.account_type || '—'),
+        'Followers: ' + (typeof followers === 'undefined' ? '—' : followers),
+        'Following: ' + (typeof following === 'undefined' ? '—' : following),
+        'Media count: ' + (typeof mediaCount === 'undefined' ? '—' : mediaCount),
+        'Accounts reached: ' + reach,
+        'Accounts engaged: ' + engaged,
+        'Total interactions: ' + interactions,
+        'Views: ' + views,
+        '',
+        'Next step:',
+        mediaItems.length
+          ? 'Use your recent posts and counts to shape stronger posting advice.'
+          : 'Pull more media and compare weekly changes for better advice.'
+      ];
+      planBox.textContent = lines.join('\n');
     }
 
     if (proInsightsBox) {
+      const mediaHtml = mediaItems.length
+        ? '<div style="margin-top:10px;display:grid;gap:8px;">' + mediaItems.slice(0, 4).map((item, index) => {
+            const caption = (item?.caption || '').trim();
+            return '<div style="padding:10px 12px;border:1px solid #dbeafe;border-radius:12px;background:#ffffff;color:#1e3a8a;line-height:1.5;">' +
+              '<strong>Recent post ' + (index + 1) + ':</strong> ' +
+              mbEscapeHtml(caption ? caption.slice(0, 120) : (item?.media_type || 'Post')) +
+              (item?.permalink ? ' <a href="' + mbEscapeHtml(item.permalink) + '" target="_blank" rel="noopener">Open</a>' : '') +
+              '</div>';
+          }).join('') + '</div>'
+        : '<div style="margin-top:10px;color:#1e3a8a;">No recent media was returned yet.</div>';
+
       proInsightsBox.innerHTML =
-        '<div style="padding:10px 12px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;color:#1d4ed8;font-weight:700;line-height:1.5;">' +
-        'Instagram connected. First profile data was returned from your backend. The next upgrade is requesting more allowed Instagram fields and then turning them into MIKEY advice.' +
+        '<div style="padding:10px 12px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;color:#1d4ed8;font-weight:700;line-height:1.6;">' +
+        'Instagram connected with live account data.' +
+        '<br>Followers: <strong>' + mbEscapeHtml(typeof followers === 'undefined' ? '—' : followers) + '</strong>' +
+        ' • Reach: <strong>' + mbEscapeHtml(reach) + '</strong>' +
+        ' • Engagement: <strong>' + mbEscapeHtml(engaged) + '</strong>' +
+        '<br>MIKEY advice: keep posting consistently, reuse content formats that already got reach, and turn your strongest recent post into a repeatable series.' +
+        mediaHtml +
         '</div>';
     }
   }
@@ -8811,11 +8912,17 @@ Pull more Instagram fields and whatever stats your app is allowed to read.`;
       const profileData = await mbFetchInstagramProfile(accessToken);
       try { localStorage.setItem('mb_instagram_profile', JSON.stringify(profileData)); } catch (e) {}
 
+      const mediaData = await mbFetchInstagramMedia(accessToken);
+      const insightsData = await mbFetchInstagramInsights(accessToken, profileData?.user_id || tokenData?.user_id);
+
+      try { localStorage.setItem('mb_instagram_media', JSON.stringify(mediaData || {})); } catch (e) {}
+      try { localStorage.setItem('mb_instagram_insights', JSON.stringify(insightsData || {})); } catch (e) {}
+
       mbPersistInstagramConnection(profileData);
       mbSetInstagramActive(true);
-      mbRenderInstagramProfile(profileData);
+      mbRenderInstagramProfile(profileData, mediaData, insightsData);
       mbShowInstagramStatus(
-        'Instagram connected. Username: <strong>' + mbEscapeHtml(profileData?.username || '—') + '</strong> • Account type: <strong>' + mbEscapeHtml(profileData?.account_type || '—') + '</strong>',
+        'Instagram connected. Username: <strong>' + mbEscapeHtml(profileData?.username || '—') + '</strong> • Followers: <strong>' + mbEscapeHtml(typeof profileData?.followers_count === 'undefined' ? '—' : profileData.followers_count) + '</strong> • Account type: <strong>' + mbEscapeHtml(profileData?.account_type || '—') + '</strong>',
         true
       );
     } catch (error) {
