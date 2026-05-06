@@ -1337,209 +1337,120 @@
 #dirGrid .mb-unified-card .dir-main,
 #dirGrid .mb-unified-card .dir-actions{position:relative;z-index:4;}
 </style>
-<style id="mb-instagram-results-polish">
-/* ===== MIKEY / Instagram results polish ===== */
-#ai .mb-ai-pro-results{
-  margin-top:18px;
-  animation:mbResultsIn .38s ease both;
-}
-@keyframes mbResultsIn{
-  from{opacity:0; transform:translateY(12px)}
-  to{opacity:1; transform:translateY(0)}
-}
-#ai .mb-ai-pro-hero-card{
-  position:relative;
-  overflow:hidden;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:18px;
-  color:#fff;
-  border:1px solid rgba(255,255,255,.16);
-  background:
-    radial-gradient(circle at top left, rgba(255,0,128,.55), transparent 30%),
-    radial-gradient(circle at bottom right, rgba(26,163,255,.56), transparent 34%),
-    linear-gradient(135deg,#111827,#020617 68%);
-  box-shadow:0 24px 60px rgba(15,23,42,.26);
-}
-#ai .mb-ai-pro-hero-glow{
-  position:absolute;
-  inset:-80px -60px auto auto;
-  width:220px;
-  height:220px;
-  border-radius:999px;
-  background:rgba(255,255,255,.16);
-  filter:blur(10px);
-}
-#ai .mb-ai-pro-hero-content{position:relative;z-index:1;max-width:680px}
-#ai .mb-ai-pro-kicker,
-#ai .mb-ai-pro-label{
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  font-size:11px;
-  font-weight:900;
-  letter-spacing:.10em;
-  text-transform:uppercase;
-}
-#ai .mb-ai-pro-kicker{
-  padding:7px 11px;
-  border-radius:999px;
-  background:rgba(255,255,255,.12);
-  border:1px solid rgba(255,255,255,.20);
-  color:#e0f2fe;
-}
-#ai .mb-ai-pro-hero-card h3{
-  margin:12px 0 6px;
-  font-size:clamp(24px,4vw,38px);
-  line-height:1.05;
-}
-#ai .mb-ai-pro-hero-card p{
-  margin:0;
-  color:#cbd5e1;
-  line-height:1.55;
-}
-#ai .mb-ai-pro-score{
-  position:relative;
-  z-index:1;
-  min-width:92px;
-  height:92px;
-  border-radius:28px;
-  display:grid;
-  place-items:center;
-  background:rgba(255,255,255,.10);
-  border:1px solid rgba(255,255,255,.18);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.20);
-}
-#ai .mb-ai-pro-score span{font-size:10px;font-weight:900;letter-spacing:.14em;color:#93c5fd}
-#ai .mb-ai-pro-score strong{font-size:30px;line-height:1}
-#ai .mb-ai-pro-grid{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:14px;
-}
-#ai .mb-ai-pro-card{
-  border:1px solid rgba(226,232,240,.94);
-  background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(248,250,252,.94));
-  box-shadow:0 16px 36px rgba(15,23,42,.08);
-}
-#ai .mb-ai-card-head{
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:12px;
-  flex-wrap:wrap;
-  margin-bottom:12px;
-}
-#ai .mb-ai-card-head h3{margin:4px 0 0;font-size:20px}
-#ai .mb-ai-pro-label{color:#64748b}
-#ai .mb-ai-pro-chip{
-  display:inline-flex;
-  align-items:center;
-  padding:7px 10px;
-  border-radius:999px;
-  font-size:11px;
-  font-weight:900;
-  color:#0369a1;
-  background:rgba(14,165,233,.10);
-  border:1px solid rgba(14,165,233,.18);
-}
-#ai .mb-ai-result-list{
-  list-style:none;
-  padding:0;
-  margin:0;
-  display:grid;
-  gap:10px;
-}
-#ai .mb-ai-result-list li{
-  position:relative;
-  display:grid;
-  grid-template-columns:34px 1fr;
-  gap:10px;
-  align-items:flex-start;
-  padding:12px;
-  border-radius:16px;
-  border:1px solid #e2e8f0;
-  background:#fff;
-  box-shadow:0 8px 20px rgba(15,23,42,.055);
-  color:#334155;
-  line-height:1.5;
-}
-#ai .mb-ai-result-list li::before{
-  content:attr(data-icon);
-  width:34px;
-  height:34px;
-  border-radius:13px;
-  display:grid;
-  place-items:center;
-  background:linear-gradient(135deg,rgba(26,163,255,.14),rgba(255,0,128,.10));
-  color:#0f172a;
-}
-#ai .mb-ai-result-list li strong{color:#0f172a}
-#ai .mb-ai-plan-list{
-  display:grid;
-  gap:10px;
-  white-space:normal;
-  font-family:inherit;
-}
-#ai .mb-ai-plan-step{
-  display:flex;
-  align-items:flex-start;
-  gap:10px;
-  padding:12px;
-  border-radius:16px;
-  border:1px solid #dbeafe;
-  background:linear-gradient(180deg,#ffffff,#f8fbff);
-  box-shadow:0 8px 22px rgba(14,127,212,.06);
-  color:#334155;
-  line-height:1.5;
-}
-#ai .mb-ai-plan-num{
-  flex:0 0 auto;
-  min-width:30px;
-  height:30px;
-  border-radius:999px;
-  display:grid;
-  place-items:center;
-  font-weight:900;
-  color:#fff;
-  background:linear-gradient(180deg,var(--mb-blue),var(--mb-blue-2));
-}
-#ai .mb-ai-pro-insights{display:grid;gap:10px}
-#ai .mb-ai-pro-block{
-  padding:13px;
-  border-radius:16px;
-  border:1px solid #e2e8f0;
-  background:#fff;
-  box-shadow:0 8px 18px rgba(15,23,42,.05);
-}
-#ai .mb-ai-pro-block-title{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  font-weight:900;
-  margin-bottom:8px;
-  color:#0f172a;
-}
-#ai .mb-ai-pro-line{
-  margin:6px 0;
-  color:#334155;
-  line-height:1.55;
-}
-#ai .mb-ai-advice-box{
-  border:1px dashed #cbd5e1;
-  border-radius:16px;
-  padding:14px;
-  background:#fff;
-  color:#475569;
-  line-height:1.6;
-}
-@media (max-width:740px){
-  #ai .mb-ai-pro-hero-card{align-items:flex-start;flex-direction:column}
-  #ai .mb-ai-pro-grid{grid-template-columns:1fr}
-  #ai .mb-ai-pro-score{width:100%;height:auto;min-height:72px;grid-template-columns:auto auto;justify-content:center;gap:8px}
-}
+
+<!-- ===== Instagram/Mikey result TEXT polish only — keeps the same boxes + layout ===== -->
+<style id="mb-instagram-results-text-polish-only">
+  /* Keep the existing results format. This only improves the returned text readability. */
+  #aiResults .panel-card h3{
+    margin-bottom:10px;
+    font-size:18px;
+    line-height:1.25;
+    font-weight:900;
+    letter-spacing:-.02em;
+    color:#0f172a;
+  }
+
+  #aiResults .signals,
+  #aiResults .bullets{
+    margin:10px 0 0;
+    padding-left:0;
+    list-style:none;
+  }
+
+  #aiResults .signals li,
+  #aiResults .bullets li{
+    position:relative;
+    margin:8px 0;
+    padding:10px 12px 10px 36px;
+    border:1px solid rgba(226,232,240,.95);
+    border-radius:12px;
+    background:linear-gradient(180deg, rgba(255,255,255,.96), rgba(248,250,252,.9));
+    color:#334155;
+    font-size:14px;
+    line-height:1.55;
+    box-shadow:0 6px 16px rgba(15,23,42,.04);
+  }
+
+  #aiResults .signals li::before,
+  #aiResults .bullets li::before{
+    content:"✓";
+    position:absolute;
+    left:12px;
+    top:10px;
+    width:17px;
+    height:17px;
+    border-radius:999px;
+    display:grid;
+    place-items:center;
+    background:rgba(26,163,255,.12);
+    color:var(--mb-blue-2);
+    font-size:11px;
+    font-weight:900;
+  }
+
+  #aiResults strong{
+    color:#0f172a;
+    font-weight:900;
+  }
+
+  #aiResults a{
+    color:var(--mb-blue-2);
+    font-weight:800;
+    text-decoration:none;
+    border-bottom:1px solid rgba(14,127,212,.28);
+  }
+
+  #aiResults a:hover{
+    border-bottom-color:var(--mb-blue-2);
+  }
+
+  #aiResults .plan-box{
+    margin-top:10px;
+    white-space:pre-wrap;
+    overflow:auto;
+    padding:14px;
+    border:1px solid rgba(226,232,240,.95);
+    border-radius:14px;
+    background:linear-gradient(180deg, #0f172a, #1e293b);
+    color:#e2e8f0;
+    font-family:Poppins, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    font-size:13px;
+    line-height:1.7;
+    box-shadow:0 10px 22px rgba(15,23,42,.12);
+  }
+
+  #manualAdviceBox,
+  #proInsightsBox{
+    color:#334155;
+    font-size:14px;
+    line-height:1.65;
+  }
+
+  #manualAdviceBox ul,
+  #proInsightsBox ul{
+    margin:10px 0 0;
+    padding-left:0;
+    list-style:none;
+  }
+
+  #manualAdviceBox li,
+  #proInsightsBox li{
+    margin:8px 0;
+    padding:10px 12px;
+    border-radius:12px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+  }
+
+  @media (max-width:740px){
+    #aiResults .signals li,
+    #aiResults .bullets li{
+      font-size:13px;
+      padding-right:10px;
+    }
+  }
 </style>
+
 </head>
 <body>
 <header class="topbar">
@@ -1626,72 +1537,29 @@
 </div>
 </div>
 <!-- Results -->
-<div class="ai-results hidden mb-ai-pro-results" id="aiResults">
-<div class="panel-card mb-ai-pro-hero-card">
-<div class="mb-ai-pro-hero-glow" aria-hidden="true"></div>
-<div class="mb-ai-pro-hero-content">
-<span class="mb-ai-pro-kicker">MIKEY Instagram Report</span>
-<h3>Social Growth Results</h3>
-<p>Clean insight cards for engagement signals, recommended moves, and a weekly content plan while Meta finishes reviewing the API.</p>
+<div class="ai-results hidden" id="aiResults">
+<div class="panel-card">
+<h3>Top Signals (last 60 days)</h3>
+<ul class="signals" id="signalsList"></ul>
 </div>
-<div class="mb-ai-pro-score" aria-label="Growth scan status">
-<span>LIVE</span>
-<strong>AI</strong>
-</div>
-</div>
-<div class="mb-ai-pro-grid">
-<div class="panel-card mb-ai-pro-card mb-ai-signal-card">
-<div class="mb-ai-card-head">
-<div>
-<span class="mb-ai-pro-label">Signals</span>
-<h3>Top Signals</h3>
-</div>
-<span class="mb-ai-pro-chip">Last 60 days</span>
-</div>
-<ul class="signals mb-ai-result-list" id="signalsList"></ul>
-</div>
-<div class="panel-card mb-ai-pro-card mb-ai-move-card">
-<div class="mb-ai-card-head">
-<div>
-<span class="mb-ai-pro-label">Next moves</span>
+<div class="panel-card" style="margin-top:12px">
 <h3>Cross-Platform Moves</h3>
+<ul class="bullets" id="movesList"></ul>
 </div>
-<span class="mb-ai-pro-chip">Action plan</span>
-</div>
-<ul class="bullets mb-ai-result-list" id="movesList"></ul>
-</div>
-</div>
-<div class="panel-card mb-ai-pro-card mb-ai-plan-card">
-<div class="mb-ai-card-head">
-<div>
-<span class="mb-ai-pro-label">Weekly rollout</span>
+<div class="panel-card" style="margin-top:12px">
+<div style="display:flex;justify-content:space-between;align-items:center">
 <h3>Weekly Plan</h3>
-</div>
 <button class="btn outline" id="regen" type="button">Regenerate</button>
 </div>
-<div class="plan-box tiny mb-ai-plan-list" id="planBox"></div>
+<pre class="plan-box tiny" id="planBox"></pre>
 </div>
-<div class="mb-ai-pro-grid">
-<div class="panel-card mb-ai-pro-card">
-<div class="mb-ai-card-head">
-<div>
-<span class="mb-ai-pro-label">Manual stats</span>
-<h3>Manual Stats Advice</h3>
+<div class="panel-card" style="margin-top:12px">
+<h3>Manual Stats Advice (Weekly)</h3>
+<div class="tiny" id="manualAdviceBox"></div>
 </div>
-<span class="mb-ai-pro-chip">Weekly</span>
-</div>
-<div class="tiny mb-ai-advice-box" id="manualAdviceBox"></div>
-</div>
-<div class="panel-card mb-ai-pro-card">
-<div class="mb-ai-card-head">
-<div>
-<span class="mb-ai-pro-label">Creator playbook</span>
+<div class="panel-card" style="margin-top:12px">
 <h3>What Top Creators Are Doing</h3>
-</div>
-<span class="mb-ai-pro-chip">Strategy</span>
-</div>
-<div class="tiny mb-ai-pro-insights" id="proInsightsBox"></div>
-</div>
+<div class="tiny" id="proInsightsBox"></div>
 </div>
 </div>
 <!-- Streaming Signals -->
@@ -3416,18 +3284,18 @@ const MB_API_ENDPOINTS = {
     if (!ai) return false;
 
     if (Array.isArray(ai.signals) && signalsList) {
-      (window.mbRenderInsightList || ((el, arr) => { if (el) el.innerHTML = arr.map((x) => `<li>${x}</li>`).join(''); }))(signalsList, ai.signals, 'signal');
+      signalsList.innerHTML = ai.signals.map((x) => `<li>${x}</li>`).join('');
     }
     if (Array.isArray(ai.moves) && movesList) {
-      (window.mbRenderInsightList || ((el, arr) => { if (el) el.innerHTML = arr.map((x) => `<li>${x}</li>`).join(''); }))(movesList, ai.moves, 'move');
+      movesList.innerHTML = ai.moves.map((x) => `<li>${x}</li>`).join('');
     }
     if (Array.isArray(ai.plan) && planBox) {
-      (window.mbRenderPlan || ((el, arr) => { if (el) el.textContent = Array.isArray(arr) ? arr.join('\n') : String(arr || ''); }))(planBox, ai.plan);
+      planBox.textContent = ai.plan.join('\n');
     } else if (typeof ai.plan === 'string' && planBox) {
-      (window.mbRenderPlan || ((el, arr) => { if (el) el.textContent = Array.isArray(arr) ? arr.join('\n') : String(arr || ''); }))(planBox, ai.plan);
+      planBox.textContent = ai.plan;
     }
     if (Array.isArray(ai.proInsights) && proInsightsBox) {
-      proInsightsBox.innerHTML = `<div class="mb-ai-pro-block">${ai.proInsights.map((x) => `<div class="mb-ai-pro-line">${(window.mbEscapeHtml || ((v) => String(v ?? '')))(x)}</div>`).join('')}</div>`;
+      proInsightsBox.innerHTML = ai.proInsights.map((x) => `<div style="margin:4px 0">• ${x}</div>`).join('');
     }
     return true;
   }
@@ -4049,68 +3917,6 @@ const MB_API_ENDPOINTS = {
     return insights;
   }
 
-
-
-  function mbEscapeHtml(value) {
-    return String(value ?? '').replace(/[&<>'"]/g, (ch) => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      "'": '&#39;',
-      '"': '&quot;'
-    }[ch]));
-  }
-
-  function mbResultIcon(text, type) {
-    const t = String(text || '').toLowerCase();
-    if (t.includes('instagram')) return '📸';
-    if (t.includes('youtube')) return '▶️';
-    if (t.includes('tiktok')) return '🎵';
-    if (t.includes('strong') || t.includes('viral') || t.includes('up ')) return '📈';
-    if (t.includes('lower') || t.includes('flat') || t.includes('down')) return '⚠️';
-    if (type === 'move') return '🎯';
-    return '✨';
-  }
-
-  function mbBoldPlatform(text) {
-    const safe = mbEscapeHtml(text);
-    return safe.replace(/^([^:]{2,30}:)/, '<strong>$1</strong>');
-  }
-
-  function mbRenderInsightList(listEl, items, type) {
-    if (!listEl) return;
-    const arr = Array.isArray(items) ? items : [];
-    listEl.innerHTML = arr.map((x) => `<li data-icon="${mbEscapeHtml(mbResultIcon(x, type))}">${mbBoldPlatform(x)}</li>`).join('');
-  }
-
-  function mbRenderPlan(planEl, items) {
-    if (!planEl) return;
-    const arr = Array.isArray(items) ? items : String(items || '').split(/\n+/).filter(Boolean);
-    planEl.innerHTML = arr.map((x, i) => `
-      <div class="mb-ai-plan-step">
-        <span class="mb-ai-plan-num">${i + 1}</span>
-        <span>${mbBoldPlatform(x)}</span>
-      </div>
-    `).join('');
-  }
-
-  function mbRenderProInsights(box, blocks) {
-    if (!box) return;
-    if (!blocks || !blocks.length) {
-      box.innerHTML = `<div class="mb-ai-pro-block muted">Save stats first to unlock top creator strategies.</div>`;
-      return;
-    }
-    box.innerHTML = blocks.join('');
-  }
-
-
-  window.mbEscapeHtml = mbEscapeHtml;
-  window.mbResultIcon = mbResultIcon;
-  window.mbBoldPlatform = mbBoldPlatform;
-  window.mbRenderInsightList = mbRenderInsightList;
-  window.mbRenderPlan = mbRenderPlan;
-  window.mbRenderProInsights = mbRenderProInsights;
-
   function showResults() {
     if (!results) return;
 
@@ -4220,9 +4026,9 @@ const MB_API_ENDPOINTS = {
 
       const proInsights = generateProInsights(platform, latest);
       proBlocks.push(`
-        <div class="mb-ai-pro-block">
-          <div class="mb-ai-pro-block-title"><span>${platform === 'instagram' ? '📸' : '🚀'}</span><span>${mbEscapeHtml(prettyName(platform))}</span></div>
-          ${proInsights.map(i => `<div class="mb-ai-pro-line">${mbEscapeHtml(i)}</div>`).join('')}
+        <div style="margin-bottom:12px">
+          <div style="font-weight:800;margin-bottom:6px">${prettyName(platform)}</div>
+          ${proInsights.map(i => `<div style="margin:4px 0">• ${i}</div>`).join('')}
         </div>
       `);
     });
@@ -4239,14 +4045,14 @@ const MB_API_ENDPOINTS = {
       plan.push('Save your first weekly stats to generate your weekly plan.');
     }
 
-    mbRenderInsightList(signalsList, signals, 'signal');
-    mbRenderInsightList(movesList, moves, 'move');
-    mbRenderPlan(planBox, plan);
+    if (signalsList) signalsList.innerHTML = signals.map(x => `<li>${x}</li>`).join('');
+    if (movesList) movesList.innerHTML = moves.map(x => `<li>${x}</li>`).join('');
+    if (planBox) planBox.textContent = plan.join('\n');
 
     if (proInsightsBox) {
       proInsightsBox.innerHTML = proBlocks.length
         ? proBlocks.join('')
-        : `<div class="mb-ai-pro-block muted">Save stats first to unlock top creator strategies.</div>`;
+        : `<div class="muted">Save stats first to unlock top creator strategies.</div>`;
     }
 
     results.classList.remove('hidden');
