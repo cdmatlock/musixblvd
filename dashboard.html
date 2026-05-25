@@ -5170,33 +5170,6 @@ const MB_API_ENDPOINTS = {
 
 
   /* =====================================================================
-     7) Terms & Conditions Modal (SINGLE version — fixed)
-  ====================================================================== */
-  (function(){
-    const modal    = $('#mbTermsModal');
-    const checkBox = $('#mbTermsCheck');
-    const accept   = $('#mbTermsAccept');
-
-    if (!modal || !checkBox || !accept) return;
-
-    const alreadyAccepted = localStorage.getItem('mb_terms_accepted') === '1';
-    if (!alreadyAccepted) {
-      modal.classList.remove('hidden');
-      modal.setAttribute('aria-hidden', 'false');
-    }
-
-    accept.addEventListener('click', () => {
-      if (!checkBox.checked) {
-        alert('Please check the box to confirm you agree to the Terms.');
-        return;
-      }
-      localStorage.setItem('mb_terms_accepted', '1');
-      modal.classList.add('hidden');
-      modal.setAttribute('aria-hidden', 'true');
-    });
-  })();
-
-  /* =====================================================================
      Profile Totals (shows SAME totals as Library) ✅ FIXED
      - Reads localStorage key: mb_views
      - Maps perPlatform -> chips
@@ -9131,6 +9104,89 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
 })();
 </script>
 
-</body>
+
+<script id="mb-terms-final-failsafe">
+(function(){
+  function ready(fn){
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn, { once:true });
+    else fn();
+  }
+
+  ready(function(){
+    var modal = document.getElementById('mbTermsModal');
+    var checkBox = document.getElementById('mbTermsCheck');
+    var accept = document.getElementById('mbTermsAccept');
+    if (!modal || !checkBox || !accept) return;
+
+    function safeUid(raw){
+      return String(raw || '').replace(/[^a-zA-Z0-9_-]/g, '_');
+    }
+
+    function getUid(){
+      var uid = '';
+      try { uid = sessionStorage.getItem('mb_active_uid') || ''; } catch(e) {}
+      try { uid = uid || localStorage.getItem('mb_active_uid') || ''; } catch(e) {}
+      try {
+        if (!uid && window.firebase && window.firebase.auth && window.firebase.auth().currentUser) {
+          uid = window.firebase.auth().currentUser.uid || '';
+        }
+      } catch(e) {}
+      return safeUid(uid || 'guest');
+    }
+
+    function keys(){
+      var uid = getUid();
+      return {
+        scoped: 'mb_terms_accepted__' + uid,
+        old: 'mb_terms_accepted'
+      };
+    }
+
+    function hasAccepted(){
+      var k = keys();
+      try {
+        // New user-scoped key is the real check.
+        if (localStorage.getItem(k.scoped) === '1') return true;
+      } catch(e) {}
+      return false;
+    }
+
+    function showTerms(){
+      modal.classList.remove('hidden');
+      modal.style.display = 'flex';
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function hideTerms(){
+      modal.classList.add('hidden');
+      modal.style.display = '';
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+    }
+
+    // Clean old global acceptance so one previous login cannot hide Terms for every new account.
+    try { localStorage.removeItem('mb_terms_accepted'); } catch(e) {}
+
+    if (!hasAccepted()) showTerms();
+    else hideTerms();
+
+    accept.onclick = function(){
+      if (!checkBox.checked) {
+        alert('Please check the box to confirm you agree to the Terms.');
+        return;
+      }
+      var k = keys();
+      try { localStorage.setItem(k.scoped, '1'); } catch(e) {}
+      try { localStorage.removeItem(k.old); } catch(e) {}
+      hideTerms();
+    };
+  });
+})();
+</script>
+
+<footer class="mb-footer"><a href="privacy.html">Privacy Policy</a><a href="musixblvdtc.pdf">
+Terms
+</a><a href="about.html">About</a><a href="contact.html">Contact</a></footer><style>.mb-footer{margin-top:50px;padding:20px;display:flex;justify-content:center;gap:25px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,.1);background:#071120}.mb-footer a{color:#94a3b8;text-decoration:none;font-weight:700}.mb-footer a:hover{color:#1aa3ff}</style></body>
 </html>
 
