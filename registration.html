@@ -450,46 +450,65 @@
 
         const cred = await createUserWithEmailAndPassword(auth, payload.email, password);
         const uid = cred.user.uid;
+        const profileForDashboard = { ...payload, uid };
 
-        await updateProfile(cred.user, {
-          displayName: payload.name || payload.fullName
-        });
+        // IMPORTANT: Prepare the dashboard session FIRST.
+        // This lets a new user enter dashboard.html even if Firestore profile writes
+        // are blocked by rules and need to be fixed separately.
+        try { sessionStorage.setItem('mb_active_uid', uid); } catch (_e) {}
+        try { localStorage.setItem('mb_profile', JSON.stringify(profileForDashboard)); } catch (_e) {}
+        try { localStorage.setItem('mb_profile__' + uid, JSON.stringify(profileForDashboard)); } catch (_e) {}
+        try { localStorage.setItem('mb_terms_accepted', 'true'); } catch (_e) {}
+        try { localStorage.setItem('mb_terms_accepted__' + uid, 'true'); } catch (_e) {}
+        try {
+          localStorage.setItem('mb_member_signup', JSON.stringify({
+            email: payload.email,
+            fullName: payload.fullName,
+            artistName: payload.name,
+            uid,
+            createdAt: payload.createdAt
+          }));
+        } catch (_e) {}
 
-        await setDoc(doc(db, 'users', uid), {
-          uid,
-          fullName: payload.fullName,
-          artistName: payload.artistName,
-          name: payload.artistName,
-          email: payload.email,
-          handle: payload.handle,
-          role: payload.role,
-          roleLabel: payload.roleLabel,
-          genre: payload.genre,
-          tags: payload.tags,
-          city: payload.city,
-          daw: payload.daw,
-          goal: payload.goal,
-          primaryGoal: payload.primaryGoal,
-          about: payload.about,
-          bio: payload.bio,
-          skills: payload.skills,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        }, { merge:true });
+        try {
+          await updateProfile(cred.user, {
+            displayName: payload.name || payload.fullName
+          });
+        } catch (profileErr) {
+          console.warn('Firebase display name update skipped:', profileErr);
+        }
 
-        localStorage.setItem('mb_profile', JSON.stringify({ ...payload, uid }));
-        localStorage.setItem('mb_member_signup', JSON.stringify({
-          email: payload.email,
-          fullName: payload.fullName,
-          artistName: payload.name,
-          uid,
-          createdAt: payload.createdAt
-        }));
+        // Firestore write is helpful for search/directory, but it should NOT block
+        // the user from entering the dashboard after the Auth account is created.
+        try {
+          await setDoc(doc(db, 'users', uid), {
+            uid,
+            fullName: payload.fullName,
+            artistName: payload.artistName,
+            name: payload.artistName,
+            email: payload.email,
+            handle: payload.handle,
+            role: payload.role,
+            roleLabel: payload.roleLabel,
+            genre: payload.genre,
+            tags: payload.tags,
+            city: payload.city,
+            daw: payload.daw,
+            goal: payload.goal,
+            primaryGoal: payload.primaryGoal,
+            about: payload.about,
+            bio: payload.bio,
+            skills: payload.skills,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          }, { merge:true });
+        } catch (firestoreErr) {
+          console.warn('Firestore user profile save blocked. Check Firestore rules:', firestoreErr);
+        }
 
-        setStatus('Account created. Redirecting to dashboard...', 'ok');
-        setTimeout(function(){ window.location.href = DASHBOARD_URL; }, 900);
+        setStatus('Account created. Entering dashboard...', 'ok');
+        setTimeout(function(){ window.location.assign(DASHBOARD_URL); }, 350);
       }catch(err){
-        const payload = getProfilePayload();
         setStatus(mapAuthError(err), 'err');
       } finally {
         createBtn.disabled = false;
