@@ -9196,22 +9196,28 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
 Terms
 </a><a href="about.html">About</a><a href="contact.html">Contact</a></footer><style>.mb-footer{margin-top:50px;padding:20px;display:flex;justify-content:center;gap:25px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,.1);background:#071120}.mb-footer a{color:#94a3b8;text-decoration:none;font-weight:700}.mb-footer a:hover{color:#1aa3ff}</style>
 
-
-<style>
+<style id="mobile-mikey-footer-fix">
 @media (max-width:768px){
-  #mikeyPill{
-    position:fixed !important;
-    bottom:auto !important;
-    top:90px !important;
+
+  #mikeyPill,
+  .mikey-pill,
+  .mikey-floating,
+  [id*="mikeyPill"],
+  [class*="mikey-pill"]{
+    bottom:110px !important;
     right:12px !important;
-    z-index:999 !important;
+    z-index:50 !important;
   }
 
   .mb-footer{
-    padding-bottom:35px !important;
+    padding-bottom:120px !important;
+    position:relative !important;
+    z-index:100 !important;
   }
+
 }
 </style>
+
 
 
 
