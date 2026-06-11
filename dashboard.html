@@ -8821,7 +8821,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
   }
 
   async function mbExchangeInstagramCode(code) {
-    const resp = await fetch('/api/instagram/exchange-code', {
+   const resp = await fetch('https://musixblvd.onrender.com/api/instagram/exchange-code', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code })
@@ -8834,7 +8834,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
   }
 
   async function mbFetchInstagramProfile(accessToken) {
-    const resp = await fetch('/api/instagram/profile', {
+    fetch('https://musixblvd.onrender.com/api/instagram/profile'
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ access_token: accessToken })
@@ -8847,7 +8847,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
   }
 
   async function mbFetchInstagramMedia(accessToken) {
-    const resp = await fetch('/api/instagram/media', {
+    fetch('https://musixblvd.onrender.com/api/instagram/profile'
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ access_token: accessToken })
@@ -8862,7 +8862,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
 
   async function mbFetchInstagramInsights(accessToken, userId) {
     if (!userId) return null;
-    const resp = await fetch('/api/instagram/insights', {
+    const resp = await fetch('https://musixblvd.onrender.com/api/instagram/insights', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ access_token: accessToken, user_id: String(userId) })
