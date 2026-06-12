@@ -2102,7 +2102,7 @@ Yo, I’m MIKEY. Ask me about promo strategy, rollout ideas, hooks, audience gro
 </div>
 </div>
 <script id="mb-user-storage-bootstrap">
-(function(){
+;(function(){
   const ACTIVE_UID_KEY = 'mb_active_uid';
   const PERSONAL_KEYS = new Set([
     'mb_profile',
@@ -2496,7 +2496,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 <script id="profile-controls-hotfix">
-(function(){
+;(function(){
   const PROFILE_KEY = 'mb_profile';
   const baseProfile = {
     name: '', city: '', bio: '', pic: '', theme: 'default', color: '#1aa3ff',
@@ -3371,7 +3371,7 @@ const MB_API_ENDPOINTS = {
      Topbar access request notifications
      Focused add-back: bell next to Profile without changing page layout
   ====================================================================== */
-  (function(){
+  ;(function(){
     const notifBtn = document.getElementById('notificationsBtn');
     const notifBadge = document.getElementById('notifBadge');
     const notifModal = document.getElementById('notificationsModal');
@@ -3790,7 +3790,7 @@ const MB_API_ENDPOINTS = {
    ✅ Adds "What Top Creators Are Doing"
    ✅ Includes YouTube view-based advice
 ===================================================================== */
-(function () {
+;(function () {
   const start   = $('#startAnalysis');
   const agree   = $('#agree');
   const modal   = $('#scanModal');
@@ -3809,7 +3809,7 @@ const MB_API_ENDPOINTS = {
   const anySel = () => !!$('#ai .providers .prov.active');
   const sync = () => { if (start) start.disabled = !(agree?.checked && anySel()); };
 
-  (function restoreMikeyProviderButtons() {
+  ;(function restoreMikeyProviderButtons() {
     const p = normalizeProfile(loadProfile());
 
     provBtns.forEach((btn) => {
@@ -4679,22 +4679,22 @@ const MB_API_ENDPOINTS = {
     openConnect(providerKeyRaw);
   }, true);
 
-  renderManualAdviceIntoMikey();
+ renderManualAdviceIntoMikey();
 })();
 
-  /* =====================================================================
-     4) Directory + View Modal
-  ====================================================================== */
-  (function(){
-    // Legacy demo directory renderer disabled.
-    // The real search directory and real chat flow are initialized later in the file.
-  })();
+/* =====================================================================
+   4) Directory + View Modal
+====================================================================== */
+;(function(){
+  // Legacy demo directory renderer disabled.
+  // The real search directory and real chat flow are initialized later in the file.
+})();
 
   /* =====================================================================
      5) Profile (localStorage) + Bio + Social connects + Library views card
      ✅ FIXED: uses shared normalizer + shared storage
   ====================================================================== */
-  (function () {
+  ;(function () {
     let p = normalizeProfile(loadProfile());
 
     const el = (id) => document.getElementById(id);
@@ -5021,7 +5021,7 @@ const MB_API_ENDPOINTS = {
   /* =====================================================================
      6) Library connect flow (streaming stats only — no demo totals)
   ====================================================================== */
-  (function(){
+  ;(function(){
     const consent = $('#libConsent');
     const connect = $('#libConnect');
     const refresh = $('#libRefresh');
@@ -5182,7 +5182,7 @@ const MB_API_ENDPOINTS = {
      - Maps perPlatform -> chips
      - Refreshes when you click Profile button OR tabs
   ====================================================================== */
-  (function () {
+  ;(function () {
     function fmt(n) {
       n = Number(n || 0);
       return n.toLocaleString();
@@ -5868,7 +5868,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 <script>
-(function(){
+;(function(){
   const PROFILE_KEY = 'mb_profile';
   const LIB_STATE_KEY = 'mb_library_selected_provider';
   const CONNECTED_POPUP_RE = /demo:\s*connected|connected\s*\(simulated\)/i;
@@ -7889,7 +7889,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
   }
 </style>
 <script>
-(function(){
+;(function(){
   const ENDPOINT = (location.hostname && location.hostname.includes('onrender.com'))
     ? '/api/mikey-chat'
     : 'https://musixblvd.onrender.com/api/mikey-chat';
@@ -8382,7 +8382,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
 </div>
 
 <script>
-(function(){
+;(function(){
   const dock = document.getElementById('mbMikeyDock');
   const panel = document.getElementById('mbMikeyPanel');
   const launcher = document.getElementById('mbMikeyLauncher');
@@ -8742,7 +8742,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
 
 
 <script>
-(function () {
+;(function () {
   const MB_INSTAGRAM_APP_ID = '3223245321188975';
 
   function mbGetInstagramRedirectUri() {
@@ -9112,7 +9112,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
 
 
 <script id="mb-terms-final-failsafe">
-(function(){
+;(function(){
   function ready(fn){
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn, { once:true });
     else fn();
