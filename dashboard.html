@@ -4076,36 +4076,14 @@ const MB_API_ENDPOINTS = {
       return;
     }
 
-    const instagramSelected = !!document.querySelector('#ai .providers .prov[data-p="instagram"].active');
-    let hasSavedInstagram = false;
-    try {
-      const savedIg = JSON.parse(localStorage.getItem('mb_instagram_profile') || 'null');
-      hasSavedInstagram = !!(savedIg && savedIg.username);
-    } catch (err) {
-      hasSavedInstagram = false;
-    }
-
-    // Keep the Instagram button behavior unchanged.
-    // This only makes Analyze use Instagram after OAuth has already saved data.
-    if (instagramSelected && !hasSavedInstagram) {
-      if (typeof window.mbStartInstagramOauth === 'function') {
-        window.mbStartInstagramOauth();
-      } else {
-        alert('Instagram is selected, but it has not finished connecting yet. Click Instagram again to connect.');
-      }
-      return;
-    }
-
     openModal(modal);
     talk(true);
 
     setTimeout(async () => {
       closeModal(modal);
       talk(false);
-
-      const renderedInstagram = instagramSelected && window.mbRenderSavedInstagramResults?.();
-      if (!renderedInstagram) showResults();
-
+      showResults();
+      window.mbRenderSavedInstagramResults?.();
       await enhanceMikeyResultsWithAI();
     }, 1100);
   });
@@ -8774,7 +8752,6 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
   function mbStartInstagramOauth() {
     window.location.href = mbInstagramOauthUrl();
   }
-  window.mbStartInstagramOauth = mbStartInstagramOauth;
 
   function mbShowInstagramStatus(msg, ok) {
     // IMPORTANT: connecting Instagram should NOT reveal the results area.
@@ -9222,5 +9199,106 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
 
 }
 </style>
+
+<script id="mb-instagram-analyze-live-refresh-only">
+;(function(){
+  // Minimal Instagram-only analyze patch.
+  // Does not change provider buttons or any other social flows.
+  var BACKEND = 'https://musixblvd.onrender.com';
+
+  function qs(sel){ return document.querySelector(sel); }
+  function safeJson(raw, fallback){
+    try { return JSON.parse(raw || 'null') || fallback; } catch(e){ return fallback; }
+  }
+  function showLoading(on){
+    var modal = document.getElementById('scanModal');
+    if (!modal) return;
+    modal.classList.toggle('hidden', !on);
+    modal.style.display = on ? 'grid' : '';
+    modal.setAttribute('aria-hidden', on ? 'false' : 'true');
+  }
+  async function postJson(path, payload){
+    var resp = await fetch(BACKEND + path, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload || {})
+    });
+    var data = await resp.json().catch(function(){ return {}; });
+    if (!resp.ok) {
+      throw new Error(data.error_message || data.error || data.message || ('Request failed: ' + path));
+    }
+    return data;
+  }
+  async function refreshInstagramLive(){
+    var token = '';
+    try { token = localStorage.getItem('mb_instagram_access_token') || ''; } catch(e){}
+    if (!token) {
+      // No token means the user has not completed OAuth on this browser yet.
+      if (typeof window.mbRenderSavedInstagramResults === 'function' && window.mbRenderSavedInstagramResults()) return;
+      alert('Instagram is selected, but it is not connected yet. Click Instagram and allow access first.');
+      return;
+    }
+
+    showLoading(true);
+    try {
+      var profile = await postJson('/api/instagram/profile', { access_token: token });
+      var media = null;
+      try {
+        media = await postJson('/api/instagram/media', { access_token: token });
+      } catch(mediaErr) {
+        console.warn('Instagram media refresh skipped:', mediaErr);
+        media = safeJson(localStorage.getItem('mb_instagram_media'), {});
+      }
+
+      // We are not depending on insights right now. If it fails, keep going.
+      var insights = {};
+      try {
+        var uid = (profile && (profile.user_id || profile.id)) || localStorage.getItem('mb_instagram_user_id') || '';
+        if (uid) insights = await postJson('/api/instagram/insights', { access_token: token, user_id: String(uid) });
+      } catch(insightsErr) {
+        console.warn('Instagram insights refresh skipped:', insightsErr);
+        insights = safeJson(localStorage.getItem('mb_instagram_insights'), {});
+      }
+
+      try { localStorage.setItem('mb_instagram_profile', JSON.stringify(profile || {})); } catch(e){}
+      try { localStorage.setItem('mb_instagram_media', JSON.stringify(media || {})); } catch(e){}
+      try { localStorage.setItem('mb_instagram_insights', JSON.stringify(insights || {})); } catch(e){}
+
+      if (typeof window.mbRenderInstagramProfile === 'function') {
+        window.mbRenderInstagramProfile(profile, media || {}, insights || {}, true);
+      } else if (typeof window.mbRenderSavedInstagramResults === 'function') {
+        window.mbRenderSavedInstagramResults();
+      }
+
+      if (typeof window.enhanceMikeyResultsWithAI === 'function') {
+        try { await window.enhanceMikeyResultsWithAI(); } catch(e){}
+      }
+    } catch(err) {
+      console.error('Instagram live analyze failed:', err);
+      alert('Instagram connected, but live stats could not refresh: ' + (err && err.message ? err.message : 'Unknown error'));
+      if (typeof window.mbRenderSavedInstagramResults === 'function') window.mbRenderSavedInstagramResults();
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  document.addEventListener('click', function(e){
+    var start = e.target && e.target.closest ? e.target.closest('#startAnalysis') : null;
+    if (!start) return;
+
+    var igActive = !!qs('#ai .providers .prov[data-p="instagram"].active');
+    if (!igActive) return; // leave YouTube/TikTok/Facebook/etc exactly as-is.
+
+    var agree = document.getElementById('agree');
+    if (!agree || !agree.checked) return; // let the original handler show its normal message.
+
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    refreshInstagramLive();
+  }, true);
+})();
+</script>
+
 </body>
 </html>
