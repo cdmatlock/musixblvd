@@ -9200,103 +9200,133 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
 }
 </style>
 
-<script id="mb-instagram-analyze-live-refresh-only">
+
+<script id="mb-instagram-analyze-button-failsafe">
 ;(function(){
-  // Minimal Instagram-only analyze patch.
-  // Does not change provider buttons or any other social flows.
+  // Instagram analyze failsafe — appended only, does not replace existing website code.
   var BACKEND = 'https://musixblvd.onrender.com';
 
   function qs(sel){ return document.querySelector(sel); }
-  function safeJson(raw, fallback){
+  function safeParse(raw, fallback){
     try { return JSON.parse(raw || 'null') || fallback; } catch(e){ return fallback; }
   }
-  function showLoading(on){
-    var modal = document.getElementById('scanModal');
+  function hasInstagramData(){
+    var token = '';
+    var profile = null;
+    try { token = localStorage.getItem('mb_instagram_access_token') || ''; } catch(e) {}
+    try { profile = safeParse(localStorage.getItem('mb_instagram_profile'), null); } catch(e) {}
+    return !!(token || (profile && profile.username));
+  }
+  function ensureInstagramActive(){
+    if (!hasInstagramData()) return;
+    var btn = qs('#ai .providers .prov[data-p="instagram"]');
+    if (btn) btn.classList.add('active');
+    var start = qs('#startAnalysis');
+    var agree = qs('#agree');
+    var anyActive = !!qs('#ai .providers .prov.active');
+    if (start && agree && agree.checked && anyActive) start.disabled = false;
+  }
+  function showScan(on){
+    var modal = qs('#scanModal');
     if (!modal) return;
     modal.classList.toggle('hidden', !on);
     modal.style.display = on ? 'grid' : '';
-    modal.setAttribute('aria-hidden', on ? 'false' : 'true');
   }
-  async function postJson(path, payload){
-    var resp = await fetch(BACKEND + path, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(payload || {})
+  async function postJson(path, body){
+    var res = await fetch(BACKEND + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {})
     });
-    var data = await resp.json().catch(function(){ return {}; });
-    if (!resp.ok) {
-      throw new Error(data.error_message || data.error || data.message || ('Request failed: ' + path));
-    }
+    var data = await res.json().catch(function(){ return {}; });
+    if (!res.ok) throw new Error(data.error || data.message || data.error_message || ('Request failed: ' + path));
     return data;
   }
-  async function refreshInstagramLive(){
+  function renderSavedFallback(){
+    if (typeof window.mbRenderSavedInstagramResults === 'function') {
+      try { return window.mbRenderSavedInstagramResults(); } catch(e) { console.warn(e); }
+    }
+    return false;
+  }
+  async function analyzeInstagramNow(){
+    ensureInstagramActive();
     var token = '';
-    try { token = localStorage.getItem('mb_instagram_access_token') || ''; } catch(e){}
+    try { token = localStorage.getItem('mb_instagram_access_token') || ''; } catch(e) {}
     if (!token) {
-      // No token means the user has not completed OAuth on this browser yet.
-      if (typeof window.mbRenderSavedInstagramResults === 'function' && window.mbRenderSavedInstagramResults()) return;
-      alert('Instagram is selected, but it is not connected yet. Click Instagram and allow access first.');
+      if (!renderSavedFallback()) {
+        alert('Instagram is not fully connected yet. Click Instagram first, allow access, then come back and press Analyze my socials.');
+      }
       return;
     }
 
-    showLoading(true);
+    showScan(true);
     try {
       var profile = await postJson('/api/instagram/profile', { access_token: token });
-      var media = null;
+      var media = {};
       try {
         media = await postJson('/api/instagram/media', { access_token: token });
       } catch(mediaErr) {
-        console.warn('Instagram media refresh skipped:', mediaErr);
-        media = safeJson(localStorage.getItem('mb_instagram_media'), {});
+        console.warn('Instagram media failed; using saved media if available.', mediaErr);
+        media = safeParse(localStorage.getItem('mb_instagram_media'), {});
       }
 
-      // We are not depending on insights right now. If it fails, keep going.
-      var insights = {};
-      try {
-        var uid = (profile && (profile.user_id || profile.id)) || localStorage.getItem('mb_instagram_user_id') || '';
-        if (uid) insights = await postJson('/api/instagram/insights', { access_token: token, user_id: String(uid) });
-      } catch(insightsErr) {
-        console.warn('Instagram insights refresh skipped:', insightsErr);
-        insights = safeJson(localStorage.getItem('mb_instagram_insights'), {});
-      }
+      // No Insights dependency right now. This keeps instagram_business_basic flow clean.
+      var insights = safeParse(localStorage.getItem('mb_instagram_insights'), {});
 
-      try { localStorage.setItem('mb_instagram_profile', JSON.stringify(profile || {})); } catch(e){}
-      try { localStorage.setItem('mb_instagram_media', JSON.stringify(media || {})); } catch(e){}
-      try { localStorage.setItem('mb_instagram_insights', JSON.stringify(insights || {})); } catch(e){}
+      try { localStorage.setItem('mb_instagram_profile', JSON.stringify(profile || {})); } catch(e) {}
+      try { localStorage.setItem('mb_instagram_media', JSON.stringify(media || {})); } catch(e) {}
 
       if (typeof window.mbRenderInstagramProfile === 'function') {
-        window.mbRenderInstagramProfile(profile, media || {}, insights || {}, true);
-      } else if (typeof window.mbRenderSavedInstagramResults === 'function') {
-        window.mbRenderSavedInstagramResults();
-      }
-
-      if (typeof window.enhanceMikeyResultsWithAI === 'function') {
-        try { await window.enhanceMikeyResultsWithAI(); } catch(e){}
+        window.mbRenderInstagramProfile(profile || {}, media || {}, insights || {}, true);
+      } else if (!renderSavedFallback()) {
+        console.log('Instagram profile:', profile);
+        console.log('Instagram media:', media);
+        alert('Instagram data loaded, but the dashboard renderer was not found. Check console for profile/media data.');
       }
     } catch(err) {
-      console.error('Instagram live analyze failed:', err);
-      alert('Instagram connected, but live stats could not refresh: ' + (err && err.message ? err.message : 'Unknown error'));
-      if (typeof window.mbRenderSavedInstagramResults === 'function') window.mbRenderSavedInstagramResults();
+      console.error('Instagram analyze failed:', err);
+      if (!renderSavedFallback()) {
+        alert('Instagram connected, but stats could not load: ' + (err && err.message ? err.message : 'Unknown error'));
+      }
     } finally {
-      showLoading(false);
+      showScan(false);
     }
   }
 
-  document.addEventListener('click', function(e){
-    var start = e.target && e.target.closest ? e.target.closest('#startAnalysis') : null;
-    if (!start) return;
+  function ready(fn){
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn, { once:true });
+    else fn();
+  }
 
-    var igActive = !!qs('#ai .providers .prov[data-p="instagram"].active');
-    if (!igActive) return; // leave YouTube/TikTok/Facebook/etc exactly as-is.
+  ready(function(){
+    ensureInstagramActive();
+    var agree = qs('#agree');
+    if (agree) agree.addEventListener('change', ensureInstagramActive);
 
-    var agree = document.getElementById('agree');
-    if (!agree || !agree.checked) return; // let the original handler show its normal message.
+    // Run a few times because other existing scripts also restore provider buttons after load.
+    var tries = 0;
+    var timer = setInterval(function(){
+      ensureInstagramActive();
+      tries += 1;
+      if (tries > 10) clearInterval(timer);
+    }, 500);
 
-    e.preventDefault();
-    e.stopPropagation();
-    e.stopImmediatePropagation();
-    refreshInstagramLive();
-  }, true);
+    document.addEventListener('click', function(e){
+      var start = e.target && e.target.closest ? e.target.closest('#startAnalysis') : null;
+      if (!start) return;
+
+      var igActive = !!qs('#ai .providers .prov[data-p="instagram"].active') || hasInstagramData();
+      if (!igActive) return; // Leave every non-Instagram social exactly alone.
+
+      var agreeBox = qs('#agree');
+      if (agreeBox && !agreeBox.checked) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      analyzeInstagramNow();
+    }, true);
+  });
 })();
 </script>
 
