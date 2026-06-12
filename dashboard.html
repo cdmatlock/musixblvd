@@ -4071,22 +4071,28 @@ const MB_API_ENDPOINTS = {
       alert('Please agree first.');
       return;
     }
-
-    // If Instagram came back from OAuth and was saved, make sure the Instagram pill is active.
-    if (!anySel() && window.mbHasInstagramConnection?.()) {
-      mbSetInstagramActive(true);
-    }
-
     if (!anySel()) {
       alert('Pick a platform.');
       return;
     }
 
     const instagramSelected = !!document.querySelector('#ai .providers .prov[data-p="instagram"].active');
+    let hasSavedInstagram = false;
+    try {
+      const savedIg = JSON.parse(localStorage.getItem('mb_instagram_profile') || 'null');
+      hasSavedInstagram = !!(savedIg && savedIg.username);
+    } catch (err) {
+      hasSavedInstagram = false;
+    }
 
-    // If the user selected Instagram but has not finished OAuth yet, send them to Instagram first.
-    if (instagramSelected && !window.mbHasInstagramConnection?.()) {
-      mbStartInstagramOauth();
+    // Keep the Instagram button behavior unchanged.
+    // This only makes Analyze use Instagram after OAuth has already saved data.
+    if (instagramSelected && !hasSavedInstagram) {
+      if (typeof window.mbStartInstagramOauth === 'function') {
+        window.mbStartInstagramOauth();
+      } else {
+        alert('Instagram is selected, but it has not finished connecting yet. Click Instagram again to connect.');
+      }
       return;
     }
 
@@ -4097,13 +4103,8 @@ const MB_API_ENDPOINTS = {
       closeModal(modal);
       talk(false);
 
-      const renderedInstagram = instagramSelected ? window.mbRenderSavedInstagramResults?.() : false;
-
-      // If Instagram is connected, show the real saved IG profile/media data.
-      // Otherwise use the regular manual-stats results for the other platforms.
-      if (!renderedInstagram) {
-        showResults();
-      }
+      const renderedInstagram = instagramSelected && window.mbRenderSavedInstagramResults?.();
+      if (!renderedInstagram) showResults();
 
       await enhanceMikeyResultsWithAI();
     }, 1100);
@@ -8773,6 +8774,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
   function mbStartInstagramOauth() {
     window.location.href = mbInstagramOauthUrl();
   }
+  window.mbStartInstagramOauth = mbStartInstagramOauth;
 
   function mbShowInstagramStatus(msg, ok) {
     // IMPORTANT: connecting Instagram should NOT reveal the results area.
@@ -8802,24 +8804,6 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     const anySel = !!document.querySelector('#ai .providers .prov.active');
     if (start) start.disabled = !(agree?.checked && anySel);
   }
-
-  function mbHasInstagramConnection() {
-    try {
-      const profileData = JSON.parse(localStorage.getItem('mb_instagram_profile') || 'null');
-      if (profileData && (profileData.username || profileData.user_id || profileData.id)) return true;
-    } catch (e) {}
-    try {
-      const token = localStorage.getItem('mb_instagram_access_token') || '';
-      if (token) return true;
-    } catch (e) {}
-    try {
-      const profile = JSON.parse(localStorage.getItem('mb_profile') || '{}');
-      if (profile?.socialConnected?.ig) return true;
-    } catch (e) {}
-    return false;
-  }
-
-  window.mbHasInstagramConnection = mbHasInstagramConnection;
 
   function mbPersistInstagramConnection(profileData) {
     try {
@@ -9070,14 +9054,6 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
-
-    // If Instagram already connected, do NOT restart OAuth every time the user taps Instagram.
-    // Just mark it active so "Analyze my socials" can use the saved Instagram data.
-    if (mbHasInstagramConnection()) {
-      mbSetInstagramActive(true);
-      mbShowInstagramStatus('Instagram is already connected. Click <strong>Analyze my socials</strong> to load the saved account data.', true);
-      return;
-    }
 
     mbStartInstagramOauth();
   }, true);
