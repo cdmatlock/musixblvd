@@ -3790,7 +3790,7 @@ const MB_API_ENDPOINTS = {
    ✅ Adds "What Top Creators Are Doing"
    ✅ Includes YouTube view-based advice
 ===================================================================== */
-;(function () {
+(function () {
   const start   = $('#startAnalysis');
   const agree   = $('#agree');
   const modal   = $('#scanModal');
@@ -4679,16 +4679,16 @@ const MB_API_ENDPOINTS = {
     openConnect(providerKeyRaw);
   }, true);
 
- renderManualAdviceIntoMikey();
+  renderManualAdviceIntoMikey();
 })();
 
-/* =====================================================================
-   4) Directory + View Modal
-====================================================================== */
-;(function(){
-  // Legacy demo directory renderer disabled.
-  // The real search directory and real chat flow are initialized later in the file.
-})();
+  /* =====================================================================
+     4) Directory + View Modal
+  ====================================================================== */
+  (function(){
+    // Legacy demo directory renderer disabled.
+    // The real search directory and real chat flow are initialized later in the file.
+  })();
 
   /* =====================================================================
      5) Profile (localStorage) + Bio + Social connects + Library views card
