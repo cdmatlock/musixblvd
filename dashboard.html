@@ -7751,8 +7751,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     row.className = 'dir-chat-row' + (who === 'me' ? ' me' : '');
     row.innerHTML = `
       <div class="dir-chat-bubble">
-        ${escapeHtml(text).replace(/
-/g, '<br>')}
+        ${escapeHtml(text).replace(/\n/g, '<br>')}
         <div class="dir-chat-stamp">${who === 'me' ? 'You' : 'MIKEY'}</div>
       </div>`;
     log.appendChild(row);
@@ -8750,7 +8749,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     const isLocal = /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname || '');
     const localPath = window.location.pathname || '/dashboard.html';
     if (isLocal) return window.location.origin + localPath;
-    return 'https://musixblvd.onrender.com/dashboard.html';
+    return 'https://musixblvd.com/dashboard.html';
   }
 
   function mbInstagramOauthUrl() {
@@ -8821,7 +8820,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
   }
 
   async function mbExchangeInstagramCode(code) {
-   const resp = await fetch('https://musixblvd.onrender.com/api/instagram/exchange-code', {
+    const resp = await fetch('https://musixblvd.onrender.com/api/instagram/exchange-code', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code })
@@ -8834,7 +8833,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
   }
 
   async function mbFetchInstagramProfile(accessToken) {
-    fetch('https://musixblvd.onrender.com/api/instagram/profile'
+    const resp = await fetch('https://musixblvd.onrender.com/api/instagram/profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ access_token: accessToken })
@@ -8847,7 +8846,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
   }
 
   async function mbFetchInstagramMedia(accessToken) {
-    fetch('https://musixblvd.onrender.com/api/instagram/profile'
+    const resp = await fetch('https://musixblvd.onrender.com/api/instagram/media', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ access_token: accessToken })
