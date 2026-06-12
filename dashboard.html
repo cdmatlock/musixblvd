@@ -2098,6 +2098,11 @@ Yo, I’m MIKEY. Ask me about promo strategy, rollout ideas, hooks, audience gro
 </div>
 <script id="mb-user-storage-bootstrap">
 ;(function(){
+
+  // Safe global DOM helpers used by later dashboard blocks.
+  // Keep these on window so unwrapped scripts can call $() and $$().
+  window.$ = window.$ || function(sel, root){ return (root || document).querySelector(sel); };
+  window.$$ = window.$$ || function(sel, root){ return Array.from((root || document).querySelectorAll(sel)); };
   const ACTIVE_UID_KEY = 'mb_active_uid';
   const PERSONAL_KEYS = new Set([
     'mb_profile',
