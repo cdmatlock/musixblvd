@@ -18,7 +18,7 @@ const __dirname = path.dirname(__filename);
 
 const INSTAGRAM_APP_ID = process.env.INSTAGRAM_APP_ID || '3223245321188975';
 const INSTAGRAM_APP_SECRET = process.env.INSTAGRAM_APP_SECRET || '';
-const INSTAGRAM_REDIRECT_URI = 'https://musixblvd.onrender.com/dashboard.html';
+const INSTAGRAM_REDIRECT_URI = 'https://musixblvd.com/dashboard.html';
 
 app.use(cors({
   origin: (origin, callback) => callback(null, true),
