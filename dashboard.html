@@ -9303,11 +9303,45 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
       document.body.style.overflow = '';
     }
 
+    function isOAuthCallbackPageLoad(){
+      try {
+        var params = new URLSearchParams(window.location.search || '');
+        var hasCode = !!params.get('code');
+        var state = params.get('state') || '';
+        var pendingProvider = '';
+        var savedSoundCloudState = '';
+        try { pendingProvider = localStorage.getItem('mb_pending_provider') || ''; } catch(e) {}
+        try { savedSoundCloudState = localStorage.getItem('mb_soundcloud_oauth_state') || ''; } catch(e) {}
+
+        // SoundCloud redirects back to dashboard.html with ?code= and ?state=.
+        // Do not show the Terms modal during that OAuth return trip.
+        if (hasCode && (
+          pendingProvider === 'soundcloud' ||
+          (state && savedSoundCloudState && state === savedSoundCloudState)
+        )) {
+          return true;
+        }
+
+        try {
+          if (localStorage.getItem('mb_soundcloud_callback_pending') === '1') return true;
+        } catch(e) {}
+
+        return false;
+      } catch(e) {
+        return false;
+      }
+    }
+
     // Clean old global acceptance so one previous login cannot hide Terms for every new account.
     try { localStorage.removeItem('mb_terms_accepted'); } catch(e) {}
 
-    if (!hasAccepted()) showTerms();
-    else hideTerms();
+    if (isOAuthCallbackPageLoad()) {
+      hideTerms();
+    } else if (!hasAccepted()) {
+      showTerms();
+    } else {
+      hideTerms();
+    }
 
     accept.onclick = function(){
       if (!checkBox.checked) {
@@ -9684,5 +9718,3 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
 
 </body>
 </html>
-
-    
