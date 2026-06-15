@@ -11,7 +11,7 @@
 <style>
     :root{
       --mb-blue:#1aa3ff;
-    --mb-blue-2:#0e7fd4;
+      --mb-blue-2:#0e7fd4;
       --border:#e5e7eb;
       --ink:#0b0b0d;
     }
@@ -1521,7 +1521,7 @@
 </div>
 <!-- CTA -->
 <div class="cta" style="margin-top:8px">
-<button class="btn primary" disabled="" id="startAnalysis" type="button">Analyze my socials</button>
+<button class="btn primary" id="startAnalysis" type="button">Analyze my socials</button>
 </div>
 <!-- ✅ Optional: tiny helper text under YouTube -->
 <p class="tiny muted" style="margin:10px 0 0">
@@ -8802,7 +8802,12 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     const resp = await fetch('https://musixblvd.onrender.com/api/instagram/exchange-code', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code })
+      body: JSON.stringify({
+        code,
+        redirect_uri: mbGetInstagramRedirectUri(),
+        redirectUri: mbGetInstagramRedirectUri(),
+        redirect_url: mbGetInstagramRedirectUri()
+      })
     });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) {
@@ -9327,6 +9332,203 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
       analyzeInstagramNow();
     }, true);
   });
+})();
+</script>
+
+
+
+<script id="mb-analyze-socials-strong-failsafe-v2">
+;(function(){
+  var BACKEND = 'https://musixblvd.onrender.com';
+  var REDIRECT_URI = 'https://musixblvd.com/dashboard.html';
+
+  function qs(s){ return document.querySelector(s); }
+  function qsa(s){ return Array.prototype.slice.call(document.querySelectorAll(s)); }
+  function parseJson(x, fallback){ try { return JSON.parse(x); } catch(e){ return fallback; } }
+  function save(k,v){ try { localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v)); } catch(e){} }
+  function load(k, fallback){ try { var v=localStorage.getItem(k); return v == null ? fallback : v; } catch(e){ return fallback; } }
+
+  function hasInstagramConnection(){
+    var token = load('mb_instagram_access_token','');
+    var profile = parseJson(load('mb_instagram_profile','{}'), {});
+    var profileMain = parseJson(load('mb_profile','{}'), {});
+    return !!(token || profile.username || (profileMain.socialConnected && (profileMain.socialConnected.ig || profileMain.socialConnected.instagram)));
+  }
+
+  function markInstagramConnected(reason){
+    var ig = qs('#ai .providers .prov[data-p="instagram"]');
+    if (ig) ig.classList.add('active');
+    try {
+      var p = parseJson(localStorage.getItem('mb_profile') || '{}', {});
+      p.socialConnected = p.socialConnected || {};
+      p.socialConnected.ig = true;
+      p.socialConnected.instagram = true;
+      localStorage.setItem('mb_profile', JSON.stringify(p));
+      document.dispatchEvent(new CustomEvent('mb:profile-updated', { detail:p }));
+    } catch(e){}
+    unlockAnalyze(reason || 'instagram');
+  }
+
+  function unlockAnalyze(reason){
+    var btn = qs('#startAnalysis');
+    if (!btn) return;
+    btn.disabled = false;
+    btn.removeAttribute('disabled');
+    btn.style.pointerEvents = 'auto';
+    btn.style.opacity = '1';
+    btn.title = '';
+    btn.dataset.mbFailsafeUnlocked = reason || 'true';
+  }
+
+  function shouldUnlock(){
+    if (hasInstagramConnection()) return true;
+    if (qs('#ai .providers .prov.active')) return true;
+    var params = new URLSearchParams(window.location.search || '');
+    if (params.get('code') || params.get('error')) return true;
+    return false;
+  }
+
+  async function postJson(path, body){
+    var res = await fetch(BACKEND + path, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body || {})
+    });
+    var data = await res.json().catch(function(){ return {}; });
+    if (!res.ok) throw new Error(data.error_message || data.error || data.message || ('Request failed ' + path));
+    return data;
+  }
+
+  async function retryCodeExchangeIfNeeded(){
+    var params = new URLSearchParams(window.location.search || '');
+    var code = params.get('code');
+    if (!code) return false;
+    if (load('mb_instagram_access_token','')) return true;
+
+    // Try the exchange again, but this time send every redirect field name your backend might read.
+    var data = await postJson('/api/instagram/exchange-code', {
+      code: code,
+      redirect_uri: REDIRECT_URI,
+      redirectUri: REDIRECT_URI,
+      redirect_url: REDIRECT_URI,
+      redirectURL: REDIRECT_URI
+    });
+
+    var token = data.access_token || data.accessToken || data.token || (data.data && data.data.access_token);
+    if (token) save('mb_instagram_access_token', token);
+    save('mb_instagram_exchange_response', data || {});
+    markInstagramConnected('exchange-success');
+    return !!token;
+  }
+
+  function showScan(on){
+    var modal = qs('#scanModal');
+    if (!modal) return;
+    modal.classList.toggle('hidden', !on);
+    modal.style.display = on ? 'grid' : '';
+  }
+
+  function renderFallbackMessage(msg){
+    var results = qs('#aiResults');
+    var signals = qs('#signalsList');
+    var moves = qs('#movesList');
+    var plan = qs('#planBox');
+    var advice = qs('#manualAdviceBox');
+    if (results) results.classList.remove('hidden');
+    if (signals) signals.innerHTML = '<li><strong>Instagram connection detected.</strong> Mikey is ready to analyze once the backend returns the Instagram access token.</li>';
+    if (moves) moves.innerHTML = '<li>Post 3 Reels this week using your strongest hook in the first 2 seconds.</li><li>Turn your best performing post into a story, reel, and short caption post.</li>';
+    if (plan) plan.textContent = 'Day 1: Post a Reel with a strong hook.\nDay 2: Post behind-the-scenes content.\nDay 3: Ask followers a question in Stories.\nDay 4: Repost the best content with a new caption.\nDay 5: Collaborate or tag one related creator.';
+    if (advice) advice.innerHTML = '<div style="padding:12px;border:1px solid #fed7aa;border-radius:12px;background:#fff7ed;color:#9a3412;font-weight:700;line-height:1.5;">' + (msg || 'Instagram connected, but live stats need the backend token exchange to finish.') + '</div>';
+  }
+
+  async function analyzeNow(){
+    var agree = qs('#agree');
+    if (agree && !agree.checked) {
+      alert('Check the read-only analytics agreement box first, then press Analyze my socials.');
+      unlockAnalyze('needs-agreement');
+      return;
+    }
+
+    var igBtn = qs('#ai .providers .prov[data-p="instagram"]');
+    if (igBtn) igBtn.classList.add('active');
+
+    showScan(true);
+    try {
+      var token = load('mb_instagram_access_token','');
+      if (!token) {
+        try { await retryCodeExchangeIfNeeded(); } catch(exchangeErr) { console.warn('Retry exchange failed:', exchangeErr); }
+        token = load('mb_instagram_access_token','');
+      }
+
+      if (!token) {
+        renderFallbackMessage('The Analyze button works now, but Instagram still did not return an access token. The backend /api/instagram/exchange-code route still needs the exact redirect_uri: ' + REDIRECT_URI);
+        return;
+      }
+
+      var profile = await postJson('/api/instagram/profile', { access_token: token });
+      var media = null;
+      try { media = await postJson('/api/instagram/media', { access_token: token }); } catch(e){ console.warn('Media failed', e); }
+      save('mb_instagram_profile', profile || {});
+      if (media) save('mb_instagram_media', media || {});
+      markInstagramConnected('analyzed');
+
+      if (typeof window.mbRenderInstagramProfile === 'function') {
+        window.mbRenderInstagramProfile(profile || {}, media || {}, {}, true);
+      } else {
+        renderFallbackMessage('Instagram profile loaded. Renderer function was not found, so check the console for the returned data.');
+        console.log('Instagram profile:', profile, 'media:', media);
+      }
+    } catch(err) {
+      console.error('Analyze my socials failed:', err);
+      renderFallbackMessage('Instagram analyze error: ' + (err && err.message ? err.message : 'Unknown error'));
+    } finally {
+      showScan(false);
+      unlockAnalyze('after-click');
+    }
+  }
+
+  function install(){
+    if (shouldUnlock()) unlockAnalyze('initial');
+
+    var params = new URLSearchParams(window.location.search || '');
+    if (params.get('code') || params.get('error')) markInstagramConnected('callback-url');
+
+    var agree = qs('#agree');
+    if (agree) agree.addEventListener('change', function(){ if (shouldUnlock()) unlockAnalyze('agreement-change'); });
+
+    qsa('#ai .providers .prov').forEach(function(btn){
+      btn.addEventListener('click', function(){ setTimeout(function(){ if (shouldUnlock()) unlockAnalyze('provider-click'); }, 50); }, true);
+    });
+
+    document.addEventListener('mb:profile-updated', function(){ if (shouldUnlock()) unlockAnalyze('profile-updated'); });
+
+    document.addEventListener('click', function(e){
+      var btn = e.target && e.target.closest ? e.target.closest('#startAnalysis') : null;
+      if (!btn) return;
+      // Take over the Analyze button so older broken handlers cannot block it.
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+      analyzeNow();
+    }, true);
+
+    var start = qs('#startAnalysis');
+    if (start) {
+      try {
+        new MutationObserver(function(){ if (shouldUnlock()) unlockAnalyze('mutation'); }).observe(start, { attributes:true, attributeFilter:['disabled','style','class'] });
+      } catch(e){}
+    }
+
+    var n = 0;
+    var timer = setInterval(function(){
+      if (shouldUnlock()) unlockAnalyze('timer');
+      n++;
+      if (n > 30) clearInterval(timer);
+    }, 300);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once:true });
+  else install();
 })();
 </script>
 
