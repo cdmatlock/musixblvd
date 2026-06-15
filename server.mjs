@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 dotenv.config();
@@ -19,6 +20,12 @@ const __dirname = path.dirname(__filename);
 const INSTAGRAM_APP_ID = process.env.INSTAGRAM_APP_ID || '3223245321188975';
 const INSTAGRAM_APP_SECRET = process.env.INSTAGRAM_APP_SECRET || '';
 const INSTAGRAM_REDIRECT_URI = 'https://musixblvd.com/dashboard.html';
+const SOUNDCLOUD_CLIENT_ID = process.env.SOUNDCLOUD_CLIENT_ID || 'FvV3lV2BnybFVs0YkD8dE4SjXqhQ5aBa';
+const SOUNDCLOUD_CLIENT_SECRET = process.env.SOUNDCLOUD_CLIENT_SECRET || 'UfQPLMwNI0vhrvegSpBpoMg3dsuaaUoN';
+const SOUNDCLOUD_REDIRECT_URI = process.env.SOUNDCLOUD_REDIRECT_URI || 'https://musixblvd.com/dashboard.html';
+const SOUNDCLOUD_AUTH_BASE_URL = 'https://secure.soundcloud.com/authorize';
+const SOUNDCLOUD_TOKEN_URL = 'https://secure.soundcloud.com/oauth/token';
+const SOUNDCLOUD_API_BASE_URL = 'https://api.soundcloud.com';
 
 app.use(cors({
   origin: (origin, callback) => callback(null, true),
@@ -32,6 +39,27 @@ app.use(express.static(__dirname));
 app.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'mikey-server' });
 });
+
+function makeSoundCloudCodeVerifier() {
+  return crypto.randomBytes(64).toString('base64url');
+}
+
+function makeSoundCloudCodeChallenge(codeVerifier) {
+  return crypto
+    .createHash('sha256')
+    .update(codeVerifier)
+    .digest('base64url');
+}
+
+async function readJsonResponse(response) {
+  const text = await response.text();
+
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch (_error) {
+    return { error: text || 'Invalid JSON response.' };
+  }
+}
 
 function buildSystemPrompt() {
   return [
@@ -259,6 +287,150 @@ app.post('/api/instagram/insights', async (req, res) => {
     return res.status(500).json({ error: 'Instagram insights fetch failed.' });
   }
 });
+
+
+app.get('/api/soundcloud/auth-url', (_req, res) => {
+  try {
+    if (!SOUNDCLOUD_CLIENT_ID) {
+      return res.status(500).json({ error: 'Missing SOUNDCLOUD_CLIENT_ID in your environment variables.' });
+    }
+
+    const codeVerifier = makeSoundCloudCodeVerifier();
+    const codeChallenge = makeSoundCloudCodeChallenge(codeVerifier);
+    const state = crypto.randomBytes(24).toString('hex');
+
+    const authUrl = new URL(SOUNDCLOUD_AUTH_BASE_URL);
+    authUrl.searchParams.set('client_id', SOUNDCLOUD_CLIENT_ID);
+    authUrl.searchParams.set('redirect_uri', SOUNDCLOUD_REDIRECT_URI);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('code_challenge', codeChallenge);
+    authUrl.searchParams.set('code_challenge_method', 'S256');
+    authUrl.searchParams.set('state', state);
+
+    return res.json({
+      auth_url: authUrl.toString(),
+      code_verifier: codeVerifier,
+      state,
+      redirect_uri: SOUNDCLOUD_REDIRECT_URI
+    });
+  } catch (error) {
+    console.error('SoundCloud auth URL error:', error);
+    return res.status(500).json({ error: 'SoundCloud auth URL creation failed.' });
+  }
+});
+
+app.post('/api/soundcloud/exchange-code', async (req, res) => {
+  try {
+    const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+    const codeVerifier = typeof req.body?.code_verifier === 'string' ? req.body.code_verifier.trim() : '';
+
+    if (!code) {
+      return res.status(400).json({ error: 'Missing SoundCloud authorization code.' });
+    }
+
+    if (!codeVerifier) {
+      return res.status(400).json({ error: 'Missing SoundCloud PKCE code_verifier.' });
+    }
+
+    if (!SOUNDCLOUD_CLIENT_ID) {
+      return res.status(500).json({ error: 'Missing SOUNDCLOUD_CLIENT_ID in your environment variables.' });
+    }
+
+    if (!SOUNDCLOUD_CLIENT_SECRET) {
+      return res.status(500).json({ error: 'Missing SOUNDCLOUD_CLIENT_SECRET in your environment variables.' });
+    }
+
+    const form = new URLSearchParams();
+    form.set('client_id', SOUNDCLOUD_CLIENT_ID);
+    form.set('client_secret', SOUNDCLOUD_CLIENT_SECRET);
+    form.set('grant_type', 'authorization_code');
+    form.set('redirect_uri', SOUNDCLOUD_REDIRECT_URI);
+    form.set('code', code);
+    form.set('code_verifier', codeVerifier);
+
+    const tokenResp = await fetch(SOUNDCLOUD_TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form.toString()
+    });
+
+    const tokenData = await readJsonResponse(tokenResp);
+
+    if (!tokenResp.ok) {
+      console.error('SoundCloud exchange error:', tokenData);
+      return res.status(tokenResp.status).json(tokenData);
+    }
+
+    return res.json(tokenData);
+  } catch (error) {
+    console.error('SoundCloud code exchange error:', error);
+    return res.status(500).json({ error: 'SoundCloud code exchange failed.' });
+  }
+});
+
+app.post('/api/soundcloud/me', async (req, res) => {
+  try {
+    const accessToken = typeof req.body?.access_token === 'string' ? req.body.access_token.trim() : '';
+
+    if (!accessToken) {
+      return res.status(400).json({ error: 'Missing SoundCloud access token.' });
+    }
+
+    const meResp = await fetch(`${SOUNDCLOUD_API_BASE_URL}/me`, {
+      headers: {
+        Authorization: `OAuth ${accessToken}`,
+        Accept: 'application/json'
+      }
+    });
+
+    const meData = await readJsonResponse(meResp);
+
+    if (!meResp.ok) {
+      console.error('SoundCloud profile error:', meData);
+      return res.status(meResp.status).json(meData);
+    }
+
+    return res.json(meData);
+  } catch (error) {
+    console.error('SoundCloud profile fetch error:', error);
+    return res.status(500).json({ error: 'SoundCloud profile fetch failed.' });
+  }
+});
+
+app.post('/api/soundcloud/tracks', async (req, res) => {
+  try {
+    const accessToken = typeof req.body?.access_token === 'string' ? req.body.access_token.trim() : '';
+    const limitRaw = Number.parseInt(req.body?.limit, 10);
+    const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 50) : 10;
+
+    if (!accessToken) {
+      return res.status(400).json({ error: 'Missing SoundCloud access token.' });
+    }
+
+    const tracksUrl = new URL(`${SOUNDCLOUD_API_BASE_URL}/me/tracks`);
+    tracksUrl.searchParams.set('limit', String(limit));
+
+    const tracksResp = await fetch(tracksUrl.toString(), {
+      headers: {
+        Authorization: `OAuth ${accessToken}`,
+        Accept: 'application/json'
+      }
+    });
+
+    const tracksData = await readJsonResponse(tracksResp);
+
+    if (!tracksResp.ok) {
+      console.error('SoundCloud tracks error:', tracksData);
+      return res.status(tracksResp.status).json(tracksData);
+    }
+
+    return res.json(tracksData);
+  } catch (error) {
+    console.error('SoundCloud tracks fetch error:', error);
+    return res.status(500).json({ error: 'SoundCloud tracks fetch failed.' });
+  }
+});
+
 
 app.get('*', (_req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard.html'));
