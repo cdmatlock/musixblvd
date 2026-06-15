@@ -1508,7 +1508,7 @@
 <button class="prov" data-p="tiktok" type="button">TikTok</button>
 <button class="prov" data-p="facebook" type="button">Facebook</button>
 <button class="prov" data-p="twitter" type="button">X / Twitter</button>
-<button class="prov" data-p="soundcloud" type="button">Soundcloud</button>
+<button class="prov" data-p="soundcloud" type="button">SoundCloud</button>
 <button class="prov" data-p="spotify" type="button">Spotify</button>
 <button class="prov" data-p="apple music" type="button">Apple Music</button>
 </div>
@@ -4361,7 +4361,7 @@ const MB_API_ENDPOINTS = {
 
     if (!platformKeys.length) {
       if (box) box.innerHTML = `<div class="muted">No manual weekly stats saved yet. Connect a platform and enter stats.</div>`;
-      if (libraryAdvice) libraryAdvice.innerHTML = `<li class="muted">No streaming stats saved yet. Pick Spotify, Apple Music, or SoundCloud and press Connect Accounts.</li>`;
+      if (libraryAdvice) libraryAdvice.innerHTML = `<li class="muted">No streaming stats saved yet. Pick Spotify or Apple Music and press Connect Accounts.</li>`;
       return;
     }
 
@@ -4427,7 +4427,7 @@ const MB_API_ENDPOINTS = {
     if (libraryAdvice) {
       libraryAdvice.innerHTML = libraryLines.length
         ? libraryLines.join('')
-        : `<li class="muted">No streaming stats saved yet. Pick Spotify, Apple Music, or SoundCloud and press Connect Accounts.</li>`;
+        : `<li class="muted">No streaming stats saved yet. Pick Spotify or Apple Music and press Connect Accounts.</li>`;
     }
   }
 
@@ -4643,7 +4643,7 @@ const MB_API_ENDPOINTS = {
     window.mbRenderProfileViews?.();
     closeModal(connectModal);
 
-    if (manualModal && (current.kind === 'social' || ['spotify', 'soundcloud', 'apple'].includes(current.key))) {
+    if (manualModal && (current.kind === 'social' || ['spotify', 'apple'].includes(current.key))) {
       setTimeout(() => {
         openManualStatsFor(current.key, current);
       }, 120);
@@ -4652,6 +4652,137 @@ const MB_API_ENDPOINTS = {
     window.mbRenderManualAdvice?.();
     window.mbSyncAnalyzeButton?.();
   });
+
+
+  /* =========================
+     SOUNDCLOUD OAUTH CONNECT
+     - SoundCloud should NOT use the old manual link/stats popup.
+     - User can connect SoundCloud first.
+     - Agreement checkbox is only for Analyze my socials.
+  ========================== */
+  const MB_SOUNDCLOUD_BACKEND = 'https://musixblvd.onrender.com';
+
+  function mbShowSoundCloudStatus(message, ok = true) {
+    let status = document.getElementById('mbSoundCloudStatus');
+    const startBtn = document.getElementById('startAnalysis');
+
+    if (!status) {
+      status = document.createElement('p');
+      status.id = 'mbSoundCloudStatus';
+      status.className = 'tiny muted';
+      status.style.margin = '10px 0 0';
+      if (startBtn && startBtn.parentElement) {
+        startBtn.parentElement.insertAdjacentElement('afterend', status);
+      }
+    }
+
+    status.textContent = message || '';
+    status.style.color = ok ? '#64748b' : '#b91c1c';
+  }
+
+  async function mbStartSoundCloudOauth() {
+    mbShowSoundCloudStatus('Opening SoundCloud login...', true);
+
+    const resp = await fetch(MB_SOUNDCLOUD_BACKEND + '/api/soundcloud/auth-url', {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
+
+    const data = await resp.json().catch(() => ({}));
+
+    if (!resp.ok || !data.auth_url || !data.code_verifier) {
+      throw new Error(data.error || 'Could not start SoundCloud login.');
+    }
+
+    try {
+      localStorage.setItem('mb_pending_provider', 'soundcloud');
+      localStorage.setItem('mb_soundcloud_code_verifier', data.code_verifier);
+      localStorage.setItem('mb_soundcloud_oauth_state', data.state || '');
+    } catch (e) {}
+
+    window.location.href = data.auth_url;
+  }
+
+  async function mbFinishSoundCloudOauth(code) {
+    const codeVerifier = localStorage.getItem('mb_soundcloud_code_verifier') || '';
+
+    if (!codeVerifier) {
+      mbShowSoundCloudStatus('SoundCloud returned a code, but the code verifier was missing. Start SoundCloud connect again.', false);
+      return;
+    }
+
+    mbShowSoundCloudStatus('Finishing SoundCloud connection...', true);
+
+    const tokenResp = await fetch(MB_SOUNDCLOUD_BACKEND + '/api/soundcloud/exchange-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, code_verifier: codeVerifier })
+    });
+
+    const tokenData = await tokenResp.json().catch(() => ({}));
+
+    if (!tokenResp.ok || !tokenData.access_token) {
+      console.error('SoundCloud exchange failed:', tokenData);
+      mbShowSoundCloudStatus('SoundCloud login came back, but token exchange failed. Check Render logs.', false);
+      return;
+    }
+
+    try {
+      localStorage.setItem('mb_soundcloud_access_token', tokenData.access_token);
+      if (tokenData.refresh_token) localStorage.setItem('mb_soundcloud_refresh_token', tokenData.refresh_token);
+    } catch (e) {}
+
+    let profileData = {};
+    let tracksData = [];
+
+    try {
+      const meResp = await fetch(MB_SOUNDCLOUD_BACKEND + '/api/soundcloud/me', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ access_token: tokenData.access_token })
+      });
+      profileData = await meResp.json().catch(() => ({}));
+      localStorage.setItem('mb_soundcloud_profile', JSON.stringify(profileData || {}));
+    } catch (e) {
+      console.warn('SoundCloud profile fetch failed:', e);
+    }
+
+    try {
+      const tracksResp = await fetch(MB_SOUNDCLOUD_BACKEND + '/api/soundcloud/tracks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ access_token: tokenData.access_token, limit: 10 })
+      });
+      tracksData = await tracksResp.json().catch(() => []);
+      localStorage.setItem('mb_soundcloud_tracks', JSON.stringify(tracksData || []));
+    } catch (e) {
+      console.warn('SoundCloud tracks fetch failed:', e);
+    }
+
+    try {
+      const p = normalizeProfile(loadProfile());
+      p.streaming.soundcloud = true;
+      if (profileData && profileData.permalink_url) p.streamUrls.soundcloud = profileData.permalink_url;
+      saveProfile(p);
+      document.dispatchEvent(new CustomEvent('mb:profile-updated', { detail: p }));
+    } catch (e) {
+      console.warn('Could not save SoundCloud profile state:', e);
+    }
+
+    const soundBtn = document.querySelector('#ai .providers .prov[data-p="soundcloud"]');
+    if (soundBtn) soundBtn.classList.add('active');
+
+    mbShowSoundCloudStatus('SoundCloud connected. Now check the agreement box and click Analyze my socials when you are ready.', true);
+
+    try {
+      localStorage.removeItem('mb_pending_provider');
+      localStorage.removeItem('mb_soundcloud_code_verifier');
+      localStorage.removeItem('mb_soundcloud_oauth_state');
+    } catch (e) {}
+  }
+
+  window.mbStartSoundCloudOauth = mbStartSoundCloudOauth;
+  window.mbFinishSoundCloudOauth = mbFinishSoundCloudOauth;
 
   /* =========================
      PROVIDER CLICK HANDLER
@@ -4673,6 +4804,16 @@ const MB_API_ENDPOINTS = {
 
     e.preventDefault();
     e.stopPropagation();
+    e.stopImmediatePropagation();
+
+    if (providerKey === 'soundcloud') {
+      btn.classList.add('active');
+      mbStartSoundCloudOauth().catch((error) => {
+        console.error('SoundCloud OAuth start failed:', error);
+        mbShowSoundCloudStatus(error?.message || 'Could not start SoundCloud login.', false);
+      });
+      return;
+    }
 
     openConnect(providerKeyRaw);
   }, true);
@@ -5028,7 +5169,7 @@ const MB_API_ENDPOINTS = {
     const status  = $('#libConnectStatus');
     const providersWrap = document.querySelector('#library .lib-providers');
     const providerBtns = $$('#library .lib-providers .prov[data-p]');
-    const allowed = new Set(['spotify', 'apple', 'soundcloud']);
+    const allowed = new Set(['spotify', 'apple']);
     let selectedProvider = null;
 
     const hideDemoViewsCard = () => {
@@ -5081,7 +5222,7 @@ const MB_API_ENDPOINTS = {
       if (connect) connect.textContent = connected ? 'Open Connected Account' : 'Connect Account';
 
       if (status) {
-        if (!hasSelection) status.textContent = 'Select Spotify, Apple Music, or SoundCloud.';
+        if (!hasSelection) status.textContent = 'Select Spotify or Apple Music.';
         else if (!hasConsent) status.textContent = 'Check the consent box to continue.';
         else if (connected) status.textContent = `${prettyName(selectedProvider)} is already connected on your Profile page.`;
         else status.textContent = `${prettyName(selectedProvider)} is not connected yet.`;
@@ -5127,7 +5268,7 @@ const MB_API_ENDPOINTS = {
         }
 
         if (!selectedProvider || !allowed.has(selectedProvider)) {
-          alert('Please select Spotify, Apple Music, or SoundCloud first.');
+          alert('Please select Spotify or Apple Music first.');
           return;
         }
 
@@ -5980,7 +6121,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!selected) {
       connect.disabled = true;
       connect.textContent = 'Connect Accounts';
-      if (status) status.textContent = 'Select Spotify, Apple Music, or SoundCloud.';
+      if (status) status.textContent = 'Select Spotify or Apple Music.';
       return;
     }
 
@@ -9071,8 +9212,17 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
       const errDesc = url.searchParams.get('error_description');
 
       if (code) {
-        try { localStorage.setItem('mb_instagram_auth_code', code); } catch (e) {}
-        await mbHandleInstagramCallback(code);
+        const state = url.searchParams.get('state') || '';
+        const scState = localStorage.getItem('mb_soundcloud_oauth_state') || '';
+        const pendingProvider = localStorage.getItem('mb_pending_provider') || '';
+
+        if (state && scState && state === scState && pendingProvider === 'soundcloud') {
+          await mbFinishSoundCloudOauth(code);
+        } else {
+          try { localStorage.setItem('mb_instagram_auth_code', code); } catch (e) {}
+          await mbHandleInstagramCallback(code);
+        }
+
         url.searchParams.delete('code');
         url.searchParams.delete('state');
         url.searchParams.delete('error');
@@ -9153,46 +9303,11 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
       document.body.style.overflow = '';
     }
 
-    function isOAuthCallbackPageLoad(){
-      try {
-        var params = new URLSearchParams(window.location.search || '');
-        var hasCode = !!params.get('code');
-        var state = params.get('state') || '';
-        var pendingProvider = '';
-        var savedSoundCloudState = '';
-        try { pendingProvider = localStorage.getItem('mb_pending_provider') || ''; } catch(e) {}
-        try { savedSoundCloudState = localStorage.getItem('mb_soundcloud_oauth_state') || ''; } catch(e) {}
-
-        // SoundCloud redirects back to dashboard.html with ?code= and ?state=.
-        // Do not show the Terms modal during that OAuth return trip.
-        if (hasCode && (
-          pendingProvider === 'soundcloud' ||
-          (state && savedSoundCloudState && state === savedSoundCloudState)
-        )) {
-          return true;
-        }
-
-        // Also skip if the SoundCloud callback guard already captured the code.
-        try {
-          if (localStorage.getItem('mb_soundcloud_callback_pending') === '1') return true;
-        } catch(e) {}
-
-        return false;
-      } catch(e) {
-        return false;
-      }
-    }
-
     // Clean old global acceptance so one previous login cannot hide Terms for every new account.
     try { localStorage.removeItem('mb_terms_accepted'); } catch(e) {}
 
-    if (isOAuthCallbackPageLoad()) {
-      hideTerms();
-    } else if (!hasAccepted()) {
-      showTerms();
-    } else {
-      hideTerms();
-    }
+    if (!hasAccepted()) showTerms();
+    else hideTerms();
 
     accept.onclick = function(){
       if (!checkBox.checked) {
@@ -9569,3 +9684,5 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
 
 </body>
 </html>
+
+    
