@@ -1456,6 +1456,22 @@
     }
   }
 </style>
+
+<script id="mb-soundcloud-remove-old-manual-stats">
+;(function(){
+  try {
+    var raw = localStorage.getItem('mb_manual_stats');
+    if (raw) {
+      var stats = JSON.parse(raw);
+      if (stats && typeof stats === 'object' && stats.soundcloud) {
+        delete stats.soundcloud;
+        localStorage.setItem('mb_manual_stats', JSON.stringify(stats));
+      }
+    }
+  } catch(e) {}
+})();
+</script>
+
 </head>
 <body>
 <header class="topbar">
@@ -4066,6 +4082,7 @@ const MB_API_ENDPOINTS = {
     }
 
     Object.keys(byPlatform).forEach((platform) => {
+      if (String(platform).toLowerCase() === 'soundcloud') return;
       const history = Array.isArray(byPlatform[platform]) ? byPlatform[platform] : [];
       if (!history.length) return;
 
@@ -9854,6 +9871,174 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once:true });
   else install();
+})();
+</script>
+
+
+<script id="mb-soundcloud-api-card-repair">
+;(function(){
+  var BACKEND = 'https://musixblvd.onrender.com';
+
+  function ready(fn){
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn, { once:true });
+    else fn();
+  }
+
+  function parseJSON(key, fallback){
+    try {
+      var raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch(e) {
+      return fallback;
+    }
+  }
+
+  function firstNum(obj, keys){
+    obj = obj || {};
+    for (var i = 0; i < keys.length; i++) {
+      var n = Number(obj[keys[i]]);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+    return 0;
+  }
+
+  function normalizeTracks(raw){
+    if (Array.isArray(raw)) return raw;
+    if (raw && Array.isArray(raw.collection)) return raw.collection;
+    if (raw && Array.isArray(raw.data)) return raw.data;
+    return [];
+  }
+
+  function getStats(){
+    var profile = parseJSON('mb_soundcloud_profile', {});
+    var tracks = normalizeTracks(parseJSON('mb_soundcloud_tracks', []));
+    var sum = function(keys){
+      return tracks.reduce(function(total, t){ return total + firstNum(t, keys); }, 0);
+    };
+    return {
+      connected: localStorage.getItem('mb_soundcloud_connected') === '1' ||
+        !!localStorage.getItem('mb_soundcloud_access_token') ||
+        !!profile.id || !!profile.username || tracks.length > 0,
+      profile: profile,
+      tracks: tracks,
+      username: profile.username || profile.full_name || profile.permalink || 'SoundCloud',
+      url: profile.permalink_url || profile.uri || '',
+      followers: firstNum(profile, ['followers_count','followers','followersCount']),
+      following: firstNum(profile, ['followings_count','following_count','followings']),
+      trackCount: tracks.length || firstNum(profile, ['track_count','tracks_count','trackCount']),
+      plays: sum(['playback_count','plays_count','play_count','plays']),
+      likes: sum(['likes_count','favoritings_count','favorites_count']),
+      reposts: sum(['reposts_count','repost_count']),
+      comments: sum(['comment_count','comments_count'])
+    };
+  }
+
+  function renderCard(){
+    var card = document.getElementById('soundCloudApiCard');
+    var box = document.getElementById('soundCloudApiStatsBox');
+    if (!card || !box) return;
+
+    var stats = getStats();
+    var lastError = localStorage.getItem('mb_soundcloud_last_error') || '';
+
+    // If SoundCloud is selected or connected, show the card instead of hiding it.
+    var btn = document.querySelector('.prov[data-p="soundcloud"]');
+    var selected = btn && btn.classList.contains('active');
+
+    if (!stats.connected && !selected) {
+      card.classList.add('hidden');
+      return;
+    }
+
+    card.classList.remove('hidden');
+
+    if (!stats.connected) {
+      box.innerHTML = '<div style="color:#b91c1c;font-weight:800">SoundCloud is not connected yet.</div>' +
+        '<div class="tiny muted" style="margin-top:6px">Click SoundCloud and authorize your account first.</div>';
+      return;
+    }
+
+    if (!stats.profile.id && !stats.profile.username && stats.tracks.length === 0) {
+      box.innerHTML = '<div style="color:#b91c1c;font-weight:800">SoundCloud connected, but no API profile/tracks were saved.</div>' +
+        '<div class="tiny muted" style="margin-top:6px">This usually means /api/soundcloud/me or /api/soundcloud/tracks failed after redirect.</div>' +
+        (lastError ? '<pre style="white-space:pre-wrap;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:10px;margin-top:8px;color:#9a3412">' + lastError.replace(/[<>&]/g, function(c){return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c];}) + '</pre>' : '');
+      return;
+    }
+
+    function row(label, value){
+      return '<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #e2e8f0">' +
+        '<strong>' + label + '</strong><span>' + value + '</span></div>';
+    }
+
+    box.innerHTML =
+      row('Profile', stats.username || 'SoundCloud') +
+      row('Followers', Number(stats.followers || 0).toLocaleString()) +
+      row('Tracks pulled', Number(stats.trackCount || 0).toLocaleString()) +
+      row('Plays pulled', Number(stats.plays || 0).toLocaleString()) +
+      row('Likes pulled', Number(stats.likes || 0).toLocaleString()) +
+      row('Reposts pulled', Number(stats.reposts || 0).toLocaleString()) +
+      row('Comments pulled', Number(stats.comments || 0).toLocaleString()) +
+      (stats.url ? '<div style="margin-top:10px"><a href="' + stats.url + '" target="_blank" rel="noopener">Open SoundCloud profile</a></div>' : '') +
+      '<div class="tiny muted" style="margin-top:8px">These are from the SoundCloud API OAuth pull, not manual stats.</div>';
+  }
+
+  async function refreshSoundCloudApiData(){
+    var token = localStorage.getItem('mb_soundcloud_access_token') || '';
+    if (!token) return;
+
+    try {
+      var meRes = await fetch(BACKEND + '/api/soundcloud/me', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({access_token: token})
+      });
+      var meData = await meRes.json().catch(function(){ return {}; });
+      if (!meRes.ok) throw new Error('Profile API failed: ' + JSON.stringify(meData));
+      localStorage.setItem('mb_soundcloud_profile', JSON.stringify(meData));
+
+      var trRes = await fetch(BACKEND + '/api/soundcloud/tracks', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({access_token: token, limit: 25})
+      });
+      var trData = await trRes.json().catch(function(){ return []; });
+      if (!trRes.ok) throw new Error('Tracks API failed: ' + JSON.stringify(trData));
+      localStorage.setItem('mb_soundcloud_tracks', JSON.stringify(trData));
+      localStorage.setItem('mb_soundcloud_connected', '1');
+      localStorage.removeItem('mb_soundcloud_last_error');
+    } catch(e) {
+      localStorage.setItem('mb_soundcloud_last_error', e && e.message ? e.message : String(e));
+    }
+
+    renderCard();
+  }
+
+  ready(function(){
+    // Remove old manual SoundCloud zero stats every page load.
+    try {
+      var raw = localStorage.getItem('mb_manual_stats');
+      if (raw) {
+        var manual = JSON.parse(raw);
+        if (manual && manual.soundcloud) {
+          delete manual.soundcloud;
+          localStorage.setItem('mb_manual_stats', JSON.stringify(manual));
+        }
+      }
+    } catch(e) {}
+
+    renderCard();
+
+    // If connected/token exists, force a fresh API pull so the card fills in.
+    refreshSoundCloudApiData();
+
+    var analyze = document.getElementById('startAnalysis');
+    if (analyze) analyze.addEventListener('click', function(){
+      setTimeout(function(){
+        refreshSoundCloudApiData();
+        renderCard();
+      }, 400);
+    });
+  });
 })();
 </script>
 
