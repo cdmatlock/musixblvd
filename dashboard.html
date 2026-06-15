@@ -1456,6 +1456,37 @@
     }
   }
 </style>
+
+<script id="mb-soundcloud-callback-early-guard">
+;(function(){
+  try {
+    var params = new URLSearchParams(window.location.search || '');
+    var code = params.get('code') || '';
+    var state = params.get('state') || '';
+    var savedState = '';
+    try { savedState = localStorage.getItem('mb_soundcloud_oauth_state') || ''; } catch(e) {}
+
+    // If this callback belongs to SoundCloud, save it before old Instagram code handlers can grab it.
+    if (code && state && savedState && state === savedState) {
+      try {
+        localStorage.setItem('mb_soundcloud_auth_code', code);
+        localStorage.setItem('mb_soundcloud_callback_pending', '1');
+      } catch(e) {}
+
+      params.delete('code');
+      params.delete('state');
+      params.delete('error');
+      params.delete('error_description');
+      var clean = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
+      window.history.replaceState({}, document.title, clean);
+      window.MB_SOUNDCLOUD_CALLBACK_PENDING = true;
+    }
+  } catch(e) {
+    console.warn('SoundCloud early callback guard failed', e);
+  }
+})();
+</script>
+
 </head>
 <body>
 <header class="topbar">
@@ -1508,7 +1539,7 @@
 <button class="prov" data-p="tiktok" type="button">TikTok</button>
 <button class="prov" data-p="facebook" type="button">Facebook</button>
 <button class="prov" data-p="twitter" type="button">X / Twitter</button>
-<button class="prov" data-p="soundcloud" type="button">Soundcloud</button>
+<button class="prov" data-p="soundcloud" type="button">SoundCloud</button>
 <button class="prov" data-p="spotify" type="button">Spotify</button>
 <button class="prov" data-p="apple music" type="button">Apple Music</button>
 </div>
@@ -4673,15 +4704,6 @@ const MB_API_ENDPOINTS = {
 
     e.preventDefault();
     e.stopPropagation();
-
-    if (providerKey === 'soundcloud') {
-      if (typeof window.mbStartSoundCloudOauth === 'function') {
-        window.mbStartSoundCloudOauth();
-      } else {
-        alert('SoundCloud connection is loading. Please refresh the page and try again.');
-      }
-      return;
-    }
 
     openConnect(providerKeyRaw);
   }, true);
@@ -9076,17 +9098,8 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     try {
       const url = new URL(window.location.href);
       const code = url.searchParams.get('code');
-      const state = url.searchParams.get('state');
       const err = url.searchParams.get('error');
       const errDesc = url.searchParams.get('error_description');
-
-      let soundCloudState = '';
-      try { soundCloudState = localStorage.getItem('mb_soundcloud_oauth_state') || ''; } catch (e) {}
-
-      if (code && state && soundCloudState && state === soundCloudState) {
-        // This authorization code belongs to SoundCloud. Do not let Instagram consume it.
-        return;
-      }
 
       if (code) {
         try { localStorage.setItem('mb_instagram_auth_code', code); } catch (e) {}
@@ -9111,286 +9124,6 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
   })();
 })();
 </script>
-
-<script id="mb-soundcloud-oauth-final">
-;(function(){
-  var BACKEND = 'https://musixblvd.onrender.com';
-
-  function qs(sel){ return document.querySelector(sel); }
-
-  function escapeHtml(value){
-    return String(value == null ? '' : value)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
-  async function postJson(path, body){
-    var res = await fetch(BACKEND + path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body || {})
-    });
-    var data = await res.json().catch(function(){ return {}; });
-    if (!res.ok) throw new Error(data.error || data.message || data.error_description || ('Request failed: ' + path));
-    return data;
-  }
-
-  function setSoundCloudActive(isOn){
-    var btn = qs('#ai .providers .prov[data-p="soundcloud"]');
-    if (btn) btn.classList.toggle('active', !!isOn);
-
-    var start = qs('#startAnalysis');
-    var agree = qs('#agree');
-    var anySel = !!qs('#ai .providers .prov.active');
-    if (start) start.disabled = !(agree && agree.checked && anySel);
-  }
-
-  function saveSoundCloudProfile(me, tracks){
-    try {
-      localStorage.setItem('mb_soundcloud_profile', JSON.stringify(me || {}));
-      localStorage.setItem('mb_soundcloud_tracks', JSON.stringify(tracks || []));
-    } catch(e) {}
-
-    try {
-      var profile = JSON.parse(localStorage.getItem('mb_profile') || '{}');
-      profile.streaming = profile.streaming || {};
-      profile.streamUrls = profile.streamUrls || {};
-      profile.streaming.soundcloud = true;
-      if (me && me.permalink_url) profile.streamUrls.soundcloud = me.permalink_url;
-      else if (me && me.permalink) profile.streamUrls.soundcloud = 'https://soundcloud.com/' + me.permalink;
-      localStorage.setItem('mb_profile', JSON.stringify(profile));
-      document.dispatchEvent(new CustomEvent('mb:profile-updated', { detail: profile }));
-    } catch(e) {}
-  }
-
-  function showSoundCloudStatus(message, ok){
-    try { localStorage.setItem('mb_soundcloud_status_html', message); } catch(e) {}
-
-    var box = qs('#manualAdviceBox');
-    var results = qs('#aiResults');
-    if (box && results && !results.classList.contains('hidden')) {
-      box.innerHTML =
-        '<div style="padding:10px 12px;border:1px solid ' + (ok ? '#bbf7d0' : '#fecaca') +
-        ';border-radius:12px;background:' + (ok ? '#ecfdf3' : '#fef2f2') +
-        ';color:' + (ok ? '#166534' : '#b91c1c') +
-        ';font-weight:700;line-height:1.5;">' + message + '</div>';
-    }
-  }
-
-  function renderSoundCloudResults(){
-    var results = qs('#aiResults');
-    var signals = qs('#signalsList');
-    var moves = qs('#movesList');
-    var plan = qs('#planBox');
-    var pro = qs('#proInsightsBox');
-
-    var me = {};
-    var tracks = [];
-    try { me = JSON.parse(localStorage.getItem('mb_soundcloud_profile') || '{}') || {}; } catch(e) {}
-    try { tracks = JSON.parse(localStorage.getItem('mb_soundcloud_tracks') || '[]') || []; } catch(e) {}
-
-    if (results) results.classList.remove('hidden');
-
-    var username = me.username || me.full_name || me.permalink || 'SoundCloud user';
-    var followers = typeof me.followers_count === 'undefined' ? '—' : me.followers_count;
-    var trackCount = typeof me.track_count === 'undefined' ? tracks.length : me.track_count;
-    var plays = tracks.reduce(function(sum, t){ return sum + Number(t.playback_count || 0); }, 0);
-    var likes = tracks.reduce(function(sum, t){ return sum + Number(t.likes_count || t.favoritings_count || 0); }, 0);
-    var reposts = tracks.reduce(function(sum, t){ return sum + Number(t.reposts_count || 0); }, 0);
-
-    if (signals) {
-      signals.innerHTML = [
-        '<li><strong>SoundCloud profile:</strong> ' + escapeHtml(username) + '</li>',
-        '<li><strong>Followers:</strong> ' + escapeHtml(followers) + '</li>',
-        '<li><strong>Tracks returned:</strong> ' + escapeHtml(tracks.length) + '</li>',
-        '<li><strong>Total listed tracks:</strong> ' + escapeHtml(trackCount) + '</li>',
-        '<li><strong>Plays from pulled tracks:</strong> ' + escapeHtml(plays) + '</li>',
-        '<li><strong>Likes from pulled tracks:</strong> ' + escapeHtml(likes) + '</li>',
-        '<li><strong>Reposts from pulled tracks:</strong> ' + escapeHtml(reposts) + '</li>',
-        me.permalink_url ? '<li><strong>Profile link:</strong> <a href="' + escapeHtml(me.permalink_url) + '" target="_blank" rel="noopener">' + escapeHtml(me.permalink_url) + '</a></li>' : ''
-      ].filter(Boolean).join('');
-    }
-
-    if (moves) {
-      moves.innerHTML = [
-        '<li>SoundCloud is connected through OAuth, not the old manual profile-link flow.</li>',
-        '<li>MIKEY can now use your real profile and track info to give better music growth advice.</li>',
-        tracks.length ? '<li>Your pulled tracks can be reviewed for plays, likes, reposts, and release consistency.</li>' : '<li>No tracks were returned yet. If your profile has tracks, try reconnecting after SoundCloud finishes authorizing.</li>'
-      ].join('');
-    }
-
-    if (plan) {
-      plan.textContent = [
-        'SoundCloud connected successfully.',
-        'Profile: ' + username,
-        'Followers: ' + followers,
-        'Tracks pulled: ' + tracks.length,
-        'Plays from pulled tracks: ' + plays,
-        'Likes from pulled tracks: ' + likes,
-        'Reposts from pulled tracks: ' + reposts,
-        '',
-        'Next step:',
-        'Compare SoundCloud plays/reposts with Instagram content so MIKEY can suggest which songs to promote harder.'
-      ].join('\n');
-    }
-
-    if (pro) {
-      var trackHtml = tracks.length
-        ? '<div style="margin-top:10px;display:grid;gap:8px;">' + tracks.slice(0, 5).map(function(t, i){
-            var title = t.title || ('Track ' + (i + 1));
-            var link = t.permalink_url || '';
-            return '<div style="padding:10px 12px;border:1px solid #dbeafe;border-radius:12px;background:#ffffff;color:#1e3a8a;line-height:1.5;">' +
-              '<strong>' + escapeHtml(title) + '</strong><br>' +
-              'Plays: <strong>' + escapeHtml(t.playback_count || 0) + '</strong> • Likes: <strong>' + escapeHtml(t.likes_count || t.favoritings_count || 0) + '</strong> • Reposts: <strong>' + escapeHtml(t.reposts_count || 0) + '</strong>' +
-              (link ? '<br><a href="' + escapeHtml(link) + '" target="_blank" rel="noopener">Open track</a>' : '') +
-              '</div>';
-          }).join('') + '</div>'
-        : '<div style="margin-top:10px;color:#1e3a8a;">No SoundCloud tracks returned yet.</div>';
-
-      pro.innerHTML =
-        '<div style="padding:10px 12px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;color:#1d4ed8;font-weight:700;line-height:1.6;">' +
-        'SoundCloud connected with live account data.' +
-        '<br>Followers: <strong>' + escapeHtml(followers) + '</strong>' +
-        ' • Tracks pulled: <strong>' + escapeHtml(tracks.length) + '</strong>' +
-        ' • Plays: <strong>' + escapeHtml(plays) + '</strong>' +
-        trackHtml +
-        '</div>';
-    }
-  }
-
-  window.mbRenderSavedSoundCloudResults = function(){
-    try {
-      var me = JSON.parse(localStorage.getItem('mb_soundcloud_profile') || '{}');
-      if (!me || (!me.username && !me.permalink && !me.id)) return false;
-      renderSoundCloudResults();
-      return true;
-    } catch(e) {
-      return false;
-    }
-  };
-
-  window.mbStartSoundCloudOauth = async function(){
-    var agree = qs('#agree');
-    if (agree && !agree.checked) {
-      alert('Please check the consent box first.');
-      return;
-    }
-
-    try {
-      showSoundCloudStatus('Opening SoundCloud login...', true);
-      var res = await fetch(BACKEND + '/api/soundcloud/auth-url');
-      var data = await res.json().catch(function(){ return {}; });
-      if (!res.ok || !data.auth_url) {
-        throw new Error(data.error || 'Could not create SoundCloud authorization URL.');
-      }
-
-      try {
-        localStorage.setItem('mb_soundcloud_code_verifier', data.code_verifier || '');
-        localStorage.setItem('mb_soundcloud_oauth_state', data.state || '');
-      } catch(e) {}
-
-      window.location.href = data.auth_url;
-    } catch(err) {
-      console.error('SoundCloud auth start failed:', err);
-      alert('SoundCloud could not start: ' + (err.message || 'Unknown error'));
-    }
-  };
-
-  async function handleSoundCloudCallback(){
-    var url = new URL(window.location.href);
-    var code = url.searchParams.get('code');
-    var state = url.searchParams.get('state');
-    var err = url.searchParams.get('error');
-    var errDesc = url.searchParams.get('error_description');
-
-    var savedState = '';
-    var verifier = '';
-    try {
-      savedState = localStorage.getItem('mb_soundcloud_oauth_state') || '';
-      verifier = localStorage.getItem('mb_soundcloud_code_verifier') || '';
-    } catch(e) {}
-
-    if (err && savedState && state === savedState) {
-      showSoundCloudStatus('SoundCloud login error: ' + escapeHtml(errDesc || err), false);
-      url.searchParams.delete('error');
-      url.searchParams.delete('error_description');
-      url.searchParams.delete('state');
-      window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : '') + url.hash);
-      return;
-    }
-
-    if (!code || !state || !savedState || state !== savedState) return;
-
-    try {
-      showSoundCloudStatus('SoundCloud login connected. Exchanging code with your backend...', true);
-
-      if (!verifier) throw new Error('Missing SoundCloud PKCE code verifier. Please reconnect SoundCloud.');
-
-      var tokenData = await postJson('/api/soundcloud/exchange-code', {
-        code: code,
-        code_verifier: verifier
-      });
-
-      var accessToken = tokenData && tokenData.access_token;
-      if (!accessToken) throw new Error('SoundCloud did not return an access token.');
-
-      try { localStorage.setItem('mb_soundcloud_access_token', accessToken); } catch(e) {}
-
-      var me = await postJson('/api/soundcloud/me', { access_token: accessToken });
-      var tracks = await postJson('/api/soundcloud/tracks', { access_token: accessToken, limit: 10 });
-
-      saveSoundCloudProfile(me, tracks);
-      setSoundCloudActive(true);
-
-      showSoundCloudStatus(
-        'SoundCloud connected. Profile: <strong>' + escapeHtml(me.username || me.permalink || '—') +
-        '</strong> • Followers: <strong>' + escapeHtml(typeof me.followers_count === 'undefined' ? '—' : me.followers_count) +
-        '</strong>',
-        true
-      );
-
-      renderSoundCloudResults();
-    } catch(error) {
-      console.error('SoundCloud callback handling failed:', error);
-      showSoundCloudStatus('SoundCloud connected to the login flow, but MusixBlvd could not finish the backend step: ' + escapeHtml(error.message || 'Unknown error.'), false);
-      alert('SoundCloud callback failed: ' + (error.message || 'Unknown error'));
-    } finally {
-      try {
-        localStorage.removeItem('mb_soundcloud_code_verifier');
-        localStorage.removeItem('mb_soundcloud_oauth_state');
-      } catch(e) {}
-
-      url.searchParams.delete('code');
-      url.searchParams.delete('state');
-      url.searchParams.delete('error');
-      url.searchParams.delete('error_description');
-      window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : '') + url.hash);
-    }
-  }
-
-  document.addEventListener('click', function(e){
-    var scBtn = e.target.closest('#ai .providers .prov[data-p="soundcloud"]');
-    if (!scBtn) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-    e.stopImmediatePropagation();
-
-    window.mbStartSoundCloudOauth();
-  }, true);
-
-  try {
-    var saved = JSON.parse(localStorage.getItem('mb_soundcloud_profile') || '{}');
-    if (saved && (saved.username || saved.permalink || saved.id)) setSoundCloudActive(true);
-  } catch(e) {}
-
-  handleSoundCloudCallback();
-})();
-</script>
-
 <script id="mb-terms-final-failsafe">
 ;(function(){
   function ready(fn){
@@ -9827,6 +9560,186 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once:true });
   else install();
+})();
+</script>
+
+
+<script id="mb-soundcloud-oauth-no-consent-blocker">
+;(function(){
+  var BACKEND = 'https://musixblvd.onrender.com';
+
+  function ready(fn){
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn, { once:true });
+    else fn();
+  }
+
+  function qs(sel){ return document.querySelector(sel); }
+
+  function setSoundCloudStatus(message, isError){
+    var anchor = qs('#startAnalysis');
+    var status = qs('#mbSoundCloudStatus');
+    if (!status) {
+      status = document.createElement('p');
+      status.id = 'mbSoundCloudStatus';
+      status.className = 'tiny muted';
+      status.style.margin = '10px 0 0';
+      if (anchor && anchor.parentNode) anchor.parentNode.insertAdjacentElement('afterend', status);
+    }
+    status.textContent = message || '';
+    status.style.color = isError ? '#b91c1c' : '#64748b';
+  }
+
+  function saveJSON(key, value){
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch(e) {}
+  }
+
+  function loadJSON(key, fallback){
+    try {
+      var raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch(e) {
+      return fallback;
+    }
+  }
+
+  function markSoundCloudConnected(profile, tracks){
+    var btn = qs('#ai .providers .prov[data-p="soundcloud"]');
+    if (btn) btn.classList.add('active');
+
+    try {
+      var p = loadJSON('mb_profile', {});
+      p.streaming = p.streaming || {};
+      p.streamUrls = p.streamUrls || {};
+      p.streaming.soundcloud = true;
+      if (profile && profile.permalink_url) p.streamUrls.soundcloud = profile.permalink_url;
+      if (profile && profile.username) p.soundcloudUsername = profile.username;
+      localStorage.setItem('mb_profile', JSON.stringify(p));
+      document.dispatchEvent(new CustomEvent('mb:profile-updated', { detail:p }));
+    } catch(e) {}
+
+    try {
+      localStorage.setItem('mb_soundcloud_profile', JSON.stringify(profile || {}));
+      localStorage.setItem('mb_soundcloud_tracks', JSON.stringify(tracks || []));
+      localStorage.setItem('mb_soundcloud_connected', '1');
+    } catch(e) {}
+
+    var sync = window.mbSyncAnalyzeButton;
+    if (typeof sync === 'function') sync();
+
+    var name = profile && profile.username ? profile.username : 'SoundCloud';
+    setSoundCloudStatus('SoundCloud connected: ' + name + '. Now check the agreement box and click Analyze my socials when you are ready.', false);
+  }
+
+  async function connectSoundCloud(){
+    setSoundCloudStatus('Opening SoundCloud login...', false);
+
+    var res = await fetch(BACKEND + '/api/soundcloud/auth-url', {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
+
+    var data = await res.json().catch(function(){ return {}; });
+
+    if (!res.ok || !data.auth_url || !data.code_verifier) {
+      throw new Error(data.error || 'Could not start SoundCloud login.');
+    }
+
+    try {
+      localStorage.setItem('mb_soundcloud_code_verifier', data.code_verifier);
+      localStorage.setItem('mb_soundcloud_oauth_state', data.state || '');
+      localStorage.setItem('mb_pending_provider', 'soundcloud');
+    } catch(e) {}
+
+    window.location.href = data.auth_url;
+  }
+
+  async function finishSoundCloudCallback(){
+    var code = '';
+    var verifier = '';
+
+    try {
+      code = localStorage.getItem('mb_soundcloud_auth_code') || '';
+      verifier = localStorage.getItem('mb_soundcloud_code_verifier') || '';
+    } catch(e) {}
+
+    if (!code || !verifier) return;
+
+    setSoundCloudStatus('Finishing SoundCloud connection...', false);
+
+    var tokenRes = await fetch(BACKEND + '/api/soundcloud/exchange-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: code, code_verifier: verifier })
+    });
+
+    var tokenData = await tokenRes.json().catch(function(){ return {}; });
+
+    if (!tokenRes.ok || !tokenData.access_token) {
+      setSoundCloudStatus('SoundCloud connected page came back, but token exchange failed. Check Render logs.', true);
+      console.error('SoundCloud token exchange failed:', tokenData);
+      return;
+    }
+
+    try {
+      localStorage.setItem('mb_soundcloud_access_token', tokenData.access_token);
+      if (tokenData.refresh_token) localStorage.setItem('mb_soundcloud_refresh_token', tokenData.refresh_token);
+      localStorage.removeItem('mb_soundcloud_auth_code');
+      localStorage.removeItem('mb_soundcloud_callback_pending');
+      localStorage.removeItem('mb_pending_provider');
+    } catch(e) {}
+
+    var profile = {};
+    var tracks = [];
+
+    try {
+      var meRes = await fetch(BACKEND + '/api/soundcloud/me', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ access_token: tokenData.access_token })
+      });
+      profile = await meRes.json().catch(function(){ return {}; });
+    } catch(e) {
+      console.warn('SoundCloud profile fetch failed', e);
+    }
+
+    try {
+      var trRes = await fetch(BACKEND + '/api/soundcloud/tracks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ access_token: tokenData.access_token, limit: 10 })
+      });
+      tracks = await trRes.json().catch(function(){ return []; });
+    } catch(e) {
+      console.warn('SoundCloud tracks fetch failed', e);
+    }
+
+    markSoundCloudConnected(profile, tracks);
+  }
+
+  ready(function(){
+    var soundBtn = qs('#ai .providers .prov[data-p="soundcloud"]');
+
+    if (soundBtn) {
+      // Capture phase: this runs before the old manual connect popup logic.
+      soundBtn.addEventListener('click', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+
+        soundBtn.classList.add('active');
+
+        connectSoundCloud().catch(function(error){
+          console.error('SoundCloud connect failed:', error);
+          setSoundCloudStatus(error && error.message ? error.message : 'SoundCloud connection failed.', true);
+        });
+      }, true);
+    }
+
+    finishSoundCloudCallback().catch(function(error){
+      console.error('SoundCloud callback failed:', error);
+      setSoundCloudStatus(error && error.message ? error.message : 'SoundCloud callback failed.', true);
+    });
+  });
 })();
 </script>
 
