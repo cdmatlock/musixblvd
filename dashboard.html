@@ -3922,6 +3922,68 @@ const MB_API_ENDPOINTS = {
     return insights;
   }
 
+
+  function getSoundCloudApiStats() {
+    let profile = {};
+    let tracks = [];
+
+    try { profile = JSON.parse(localStorage.getItem('mb_soundcloud_profile') || '{}') || {}; } catch (e) {}
+    try { tracks = JSON.parse(localStorage.getItem('mb_soundcloud_tracks') || '[]') || []; } catch (e) {}
+
+    if (!Array.isArray(tracks)) {
+      if (Array.isArray(tracks.collection)) tracks = tracks.collection;
+      else if (Array.isArray(tracks.data)) tracks = tracks.data;
+      else tracks = [];
+    }
+
+    const nums = (obj, keys) => {
+      for (const k of keys) {
+        const v = Number(obj?.[k]);
+        if (Number.isFinite(v) && v > 0) return v;
+      }
+      return 0;
+    };
+
+    const followers = nums(profile, ['followers_count', 'followers', 'followersCount']);
+    const following = nums(profile, ['followings_count', 'following_count', 'followings']);
+    const profileTrackCount = nums(profile, ['track_count', 'tracks_count', 'trackCount']);
+    const favorites = nums(profile, ['public_favorites_count', 'likes_count', 'favorites_count']);
+
+    let plays = 0;
+    let likes = 0;
+    let reposts = 0;
+    let comments = 0;
+
+    tracks.forEach((track) => {
+      plays += nums(track, ['playback_count', 'plays_count', 'play_count', 'plays']);
+      likes += nums(track, ['likes_count', 'favoritings_count', 'favorites_count']);
+      reposts += nums(track, ['reposts_count', 'repost_count']);
+      comments += nums(track, ['comment_count', 'comments_count']);
+    });
+
+    const connected = localStorage.getItem('mb_soundcloud_connected') === '1' ||
+      !!localStorage.getItem('mb_soundcloud_access_token') ||
+      !!profile?.id ||
+      !!profile?.username ||
+      tracks.length > 0;
+
+    return {
+      connected,
+      username: profile?.username || profile?.full_name || 'SoundCloud',
+      url: profile?.permalink_url || profile?.uri || '',
+      followers,
+      following,
+      trackCount: tracks.length || profileTrackCount,
+      profileTrackCount,
+      favorites,
+      plays,
+      likes,
+      reposts,
+      comments,
+      tracks
+    };
+  }
+
   function showResults() {
     if (!results) return;
 
@@ -3932,6 +3994,50 @@ const MB_API_ENDPOINTS = {
     const moves = [];
     const plan = [];
     const proBlocks = [];
+
+
+    const soundCloudApi = getSoundCloudApiStats();
+
+    if (soundCloudApi.connected) {
+      const scBits = [];
+
+      if (soundCloudApi.username) scBits.push(`connected as ${soundCloudApi.username}`);
+      if (soundCloudApi.followers) scBits.push(`${soundCloudApi.followers.toLocaleString()} followers`);
+      if (soundCloudApi.trackCount) scBits.push(`${soundCloudApi.trackCount.toLocaleString()} tracks`);
+      if (soundCloudApi.plays) scBits.push(`${soundCloudApi.plays.toLocaleString()} total plays from pulled tracks`);
+      if (soundCloudApi.likes) scBits.push(`${soundCloudApi.likes.toLocaleString()} likes`);
+      if (soundCloudApi.reposts) scBits.push(`${soundCloudApi.reposts.toLocaleString()} reposts`);
+      if (soundCloudApi.comments) scBits.push(`${soundCloudApi.comments.toLocaleString()} comments`);
+
+      signals.push(`SoundCloud API: ${scBits.length ? scBits.join(', ') + '.' : 'connected successfully, but no public track stats came back yet.'}`);
+
+      if (soundCloudApi.trackCount > 0 && soundCloudApi.plays === 0) {
+        moves.push('SoundCloud: tracks were found, but play counts did not come back from the API. Push comments, reposts, and profile activity first.');
+      } else if (soundCloudApi.plays > 0) {
+        moves.push('SoundCloud: use your highest-played tracks for short clips, repost swaps, and profile pinning.');
+      } else {
+        moves.push('SoundCloud: upload or make tracks public so Mikey can read stronger track stats.');
+      }
+
+      if (soundCloudApi.reposts > 0 || soundCloudApi.comments > 0) {
+        moves.push('SoundCloud: repost/comment activity is visible — keep using community engagement to spread tracks.');
+      } else {
+        moves.push('SoundCloud: comment on similar artists and ask for repost swaps to start building signal.');
+      }
+
+      plan.push('SoundCloud: review your pulled tracks, promote the strongest one, and do 10–15 real comments/repost interactions this week.');
+
+      proBlocks.push(`
+        <div style="margin-bottom:12px">
+          <div style="font-weight:800;margin-bottom:6px">SoundCloud API</div>
+          <div style="margin:4px 0">• Connected profile: ${soundCloudApi.username || 'SoundCloud user'}</div>
+          <div style="margin:4px 0">• Tracks pulled: ${Number(soundCloudApi.trackCount || 0).toLocaleString()}</div>
+          <div style="margin:4px 0">• Plays pulled: ${Number(soundCloudApi.plays || 0).toLocaleString()}</div>
+          <div style="margin:4px 0">• Likes pulled: ${Number(soundCloudApi.likes || 0).toLocaleString()}</div>
+          <div style="margin:4px 0">• Reposts pulled: ${Number(soundCloudApi.reposts || 0).toLocaleString()}</div>
+        </div>
+      `);
+    }
 
     Object.keys(byPlatform).forEach((platform) => {
       const history = Array.isArray(byPlatform[platform]) ? byPlatform[platform] : [];
@@ -4771,6 +4877,8 @@ const MB_API_ENDPOINTS = {
 
     const soundBtn = document.querySelector('#ai .providers .prov[data-p="soundcloud"]');
     if (soundBtn) soundBtn.classList.add('active');
+
+    try { localStorage.setItem('mb_soundcloud_connected', '1'); } catch(e) {}
 
     mbShowSoundCloudStatus('SoundCloud connected. Now check the agreement box and click Analyze my socials when you are ready.', true);
 
