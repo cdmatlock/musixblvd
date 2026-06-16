@@ -9909,7 +9909,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
       if (scActive || scReady) {
         try { await mbAnalyzeSoundCloudFromSavedOrApi(); return; } catch(scErr) { console.error('SoundCloud fallback analyze failed:', scErr); }
       }
-      renderFallbackMessage('Analyze error: ' + (err && err.message ? err.message : 'Unknown error'));
+      renderFallbackMessage('Analyze error: ' + (window.mbStringifyAnalyzeError ? window.mbStringifyAnalyzeError(err) : (err && err.message ? err.message : 'Unknown error')));
     } finally {
       showScan(false);
       unlockAnalyze('after-click');
@@ -9961,6 +9961,46 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once:true });
   else install();
+})();
+</script>
+
+
+<script id="mb-readable-analyze-errors-hotfix">
+;(function(){
+  function stringifyError(err){
+    try {
+      if (!err) return 'Unknown error';
+      if (typeof err === 'string') return err;
+      if (err.message && err.message !== '[object Object]') return String(err.message);
+      if (err.error_description) return String(err.error_description);
+      if (err.error_message) return typeof err.error_message === 'string' ? err.error_message : JSON.stringify(err.error_message);
+      if (err.error) return typeof err.error === 'string' ? err.error : JSON.stringify(err.error);
+      if (err.message === '[object Object]' && err.cause) return stringifyError(err.cause);
+      return JSON.stringify(err);
+    } catch(e) {
+      return String(err && err.message ? err.message : err);
+    }
+  }
+  window.mbStringifyAnalyzeError = stringifyError;
+
+  var oldFetch = window.fetch;
+  window.fetch = async function(){
+    var res = await oldFetch.apply(this, arguments);
+    try {
+      var url = String(arguments[0] || '');
+      if (url.indexOf('/api/soundcloud/') !== -1 && !res.ok) {
+        var clone = res.clone();
+        var data = await clone.json().catch(function(){ return null; });
+        console.error('SoundCloud backend returned HTTP ' + res.status + ':', data || res.statusText);
+        var status = document.getElementById('mbSoundCloudStatus');
+        if (status && data) {
+          status.textContent = 'SoundCloud API error: ' + stringifyError(data);
+          status.style.color = '#b91c1c';
+        }
+      }
+    } catch(e) {}
+    return res;
+  };
 })();
 </script>
 
