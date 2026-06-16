@@ -9694,6 +9694,140 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     if (advice) advice.innerHTML = '<div style="padding:12px;border:1px solid #fed7aa;border-radius:12px;background:#fff7ed;color:#9a3412;font-weight:700;line-height:1.5;">' + (msg || 'Instagram connected, but live stats need the backend token exchange to finish.') + '</div>';
   }
 
+  function mbSafeLoadJSONForAnalyze(key, fallback){
+    try {
+      var raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch(e) {
+      return fallback;
+    }
+  }
+
+  function mbSoundCloudHasSavedData(){
+    var token = load('mb_soundcloud_access_token','');
+    var apiStats = mbSafeLoadJSONForAnalyze('mb_soundcloud_api_stats', null);
+    var profile = mbSafeLoadJSONForAnalyze('mb_soundcloud_profile', null);
+    var tracks = mbSafeLoadJSONForAnalyze('mb_soundcloud_tracks', null);
+    var store = mbSafeLoadJSONForAnalyze('mb_manual_stats', {});
+    var scRows = store && store.byPlatform && store.byPlatform.soundcloud;
+    return !!(token || apiStats || profile || (Array.isArray(tracks) && tracks.length) || (Array.isArray(scRows) && scRows.length));
+  }
+
+  async function mbAnalyzeSoundCloudFromSavedOrApi(options){
+    options = options || {};
+    var token = load('mb_soundcloud_access_token','');
+    var profile = mbSafeLoadJSONForAnalyze('mb_soundcloud_profile', {}) || {};
+    var tracks = mbSafeLoadJSONForAnalyze('mb_soundcloud_tracks', []) || [];
+    var stats = mbSafeLoadJSONForAnalyze('mb_soundcloud_api_stats', null);
+    var sourceNote = 'saved SoundCloud API stats';
+
+    // If we have a fresh SoundCloud token, pull the newest profile/tracks before rendering.
+    // This keeps Analyze my socials from showing stale or blank numbers after OAuth returns.
+    if (token) {
+      try {
+        var meResp = await fetch(MB_SOUNDCLOUD_BACKEND + '/api/soundcloud/me', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ access_token: token })
+        });
+        var meData = await meResp.json().catch(function(){ return {}; });
+        if (meResp.ok && meData && typeof meData === 'object') {
+          profile = meData;
+          localStorage.setItem('mb_soundcloud_profile', JSON.stringify(profile));
+          sourceNote = 'live SoundCloud API profile';
+        } else {
+          console.warn('SoundCloud /me during Analyze returned:', meData);
+        }
+      } catch(e) {
+        console.warn('SoundCloud /me during Analyze failed:', e);
+      }
+
+      try {
+        var tracksResp = await fetch(MB_SOUNDCLOUD_BACKEND + '/api/soundcloud/tracks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ access_token: token, limit: 50 })
+        });
+        var tracksData = await tracksResp.json().catch(function(){ return []; });
+        if (tracksResp.ok) {
+          tracks = tracksData;
+          localStorage.setItem('mb_soundcloud_tracks', JSON.stringify(tracks || []));
+          sourceNote = 'live SoundCloud API profile + tracks';
+        } else {
+          console.warn('SoundCloud /tracks during Analyze returned:', tracksData);
+        }
+      } catch(e) {
+        console.warn('SoundCloud /tracks during Analyze failed:', e);
+      }
+    }
+
+    // Build + save stats so the existing Weekly Stats / Manual Advice renderer can see SoundCloud.
+    try {
+      if (typeof mbSaveSoundCloudApiStats === 'function') {
+        stats = mbSaveSoundCloudApiStats(profile || {}, tracks || []);
+      } else if (typeof mbBuildSoundCloudWeeklyStats === 'function') {
+        stats = mbBuildSoundCloudWeeklyStats(profile || {}, tracks || []);
+        if (typeof saveWeeklyStats === 'function') saveWeeklyStats('soundcloud', stats);
+        localStorage.setItem('mb_soundcloud_api_stats', JSON.stringify(Object.assign({}, stats, { date: new Date().toISOString() })));
+      }
+    } catch(e) {
+      console.warn('SoundCloud Analyze could not rebuild weekly stats:', e);
+    }
+
+    stats = stats || mbSafeLoadJSONForAnalyze('mb_soundcloud_api_stats', null) || {};
+
+    try {
+      var p = normalizeProfile(loadProfile());
+      p.streaming.soundcloud = true;
+      if (profile && profile.permalink_url) p.streamUrls.soundcloud = profile.permalink_url;
+      saveProfile(p);
+      document.dispatchEvent(new CustomEvent('mb:profile-updated', { detail: p }));
+    } catch(e) {}
+
+    var results = qs('#aiResults');
+    var signals = qs('#signalsList');
+    var moves = qs('#movesList');
+    var plan = qs('#planBox');
+    var advice = qs('#manualAdviceBox');
+    var pro = qs('#proInsightsBox');
+    var fmtNum = function(n){ return Number(n || 0).toLocaleString(); };
+    var trackCount = Array.isArray(tracks) ? tracks.length : (Array.isArray(tracks && tracks.collection) ? tracks.collection.length : 0);
+    var profileName = profile && (profile.username || profile.full_name || profile.permalink || profile.first_name) || 'Connected SoundCloud account';
+
+    if (results) results.classList.remove('hidden');
+    if (signals) {
+      signals.innerHTML = [
+        '<li><strong>SoundCloud connected:</strong> ' + escapeHtml(profileName) + '</li>',
+        '<li><strong>Followers:</strong> ' + fmtNum(stats.followers) + '</li>',
+        '<li><strong>Tracks checked:</strong> ' + fmtNum(trackCount || stats.posts) + '</li>',
+        '<li><strong>Total plays:</strong> ' + fmtNum(stats.views) + '</li>',
+        '<li><strong>Likes:</strong> ' + fmtNum(stats.likes) + ' • <strong>Comments:</strong> ' + fmtNum(stats.comments) + ' • <strong>Reposts:</strong> ' + fmtNum(stats.shares) + '</li>',
+        '<li><strong>Source:</strong> ' + escapeHtml(sourceNote) + '</li>'
+      ].join('');
+    }
+    if (moves) {
+      moves.innerHTML = [
+        '<li>Pin or spotlight the track with the strongest plays/likes and push that link on Instagram, TikTok, and X.</li>',
+        '<li>Use the top SoundCloud track as the main content engine: short performance clip, studio clip, lyric caption, and story repost.</li>',
+        '<li>If plays are higher than likes/comments, add a stronger call-to-action asking listeners to comment, repost, or save.</li>'
+      ].join('');
+    }
+    if (plan) {
+      plan.textContent = 'Day 1: Share your best SoundCloud track with a short hook video.\nDay 2: Post a behind-the-scenes clip and link the SoundCloud track.\nDay 3: Ask listeners which track/verse is strongest.\nDay 4: Repost the track with a different caption and visual.\nDay 5: DM or tag 3 related creators for repost/collab traffic.\nDay 6: Turn comments into a follow-up post.\nDay 7: Check SoundCloud plays, likes, comments, and reposts again.';
+    }
+
+    if (typeof window.mbRenderManualAdvice === 'function') window.mbRenderManualAdvice();
+    if (advice && !advice.innerHTML.trim()) {
+      advice.innerHTML = '<div style="padding:12px;border:1px solid #dbeafe;border-radius:12px;background:#f8fbff;color:#334155;font-weight:700;line-height:1.5;">SoundCloud API stats are connected and saved. Plays: ' + fmtNum(stats.views) + ' • Followers: ' + fmtNum(stats.followers) + ' • Likes: ' + fmtNum(stats.likes) + '.</div>';
+    }
+    if (pro) {
+      pro.innerHTML = '<div style="margin:4px 0">• Top music creators keep one main track link easy to find, then cut that track into multiple short-form posts.</div><div style="margin:4px 0">• They push comments and reposts, not only plays, because engagement helps prove which song is worth promoting harder.</div>';
+    }
+
+    mbShowSoundCloudStatus('SoundCloud analyzed: ' + fmtNum(stats.followers) + ' followers • ' + fmtNum(stats.views) + ' plays • ' + fmtNum(stats.likes) + ' likes.', true);
+    return true;
+  }
+
   async function analyzeNow(){
     var agree = qs('#agree');
     if (agree && !agree.checked) {
@@ -9702,8 +9836,9 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
       return;
     }
 
-    var igBtn = qs('#ai .providers .prov[data-p="instagram"]');
-    if (igBtn) igBtn.classList.add('active');
+    var scBtn = qs('#ai .providers .prov[data-p="soundcloud"]');
+    var scActive = !!(scBtn && scBtn.classList.contains('active'));
+    var scReady = mbSoundCloudHasSavedData();
 
     showScan(true);
     try {
@@ -9713,10 +9848,19 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
         token = load('mb_instagram_access_token','');
       }
 
-      if (!token) {
-        renderFallbackMessage('The Analyze button works now, but Instagram still did not return an access token. The backend /api/instagram/exchange-code route still needs the exact redirect_uri: ' + REDIRECT_URI);
+      // Deep fix: SoundCloud is a real connected API flow now. Do not block it just because Instagram has no token.
+      if (!token && (scActive || scReady)) {
+        await mbAnalyzeSoundCloudFromSavedOrApi();
         return;
       }
+
+      if (!token) {
+        renderFallbackMessage('No connected API stats were found yet. Connect SoundCloud or Instagram first, then press Analyze my socials again.');
+        return;
+      }
+
+      var igBtn = qs('#ai .providers .prov[data-p="instagram"]');
+      if (igBtn) igBtn.classList.add('active');
 
       var profile = await postJson('/api/instagram/profile', { access_token: token });
       var media = null;
@@ -9731,9 +9875,17 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
         renderFallbackMessage('Instagram profile loaded. Renderer function was not found, so check the console for the returned data.');
         console.log('Instagram profile:', profile, 'media:', media);
       }
+
+      // If SoundCloud is also connected, refresh/save it too so Weekly Stats includes it after Analyze.
+      if (scActive || scReady) {
+        await mbAnalyzeSoundCloudFromSavedOrApi({ append: true });
+      }
     } catch(err) {
       console.error('Analyze my socials failed:', err);
-      renderFallbackMessage('Instagram analyze error: ' + (err && err.message ? err.message : 'Unknown error'));
+      if (scActive || scReady) {
+        try { await mbAnalyzeSoundCloudFromSavedOrApi(); return; } catch(scErr) { console.error('SoundCloud fallback analyze failed:', scErr); }
+      }
+      renderFallbackMessage('Analyze error: ' + (err && err.message ? err.message : 'Unknown error'));
     } finally {
       showScan(false);
       unlockAnalyze('after-click');
