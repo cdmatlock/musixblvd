@@ -1502,7 +1502,7 @@
         </p>
 <!-- Providers -->
 <div class="providers">
-<button class="prov" data-p="instagram" type="button" disabled title="Instagram disabled in SoundCloud test">Instagram (disabled)</button>
+<button class="prov" data-p="instagram" type="button">Instagram</button>
 <!-- ✅ YouTube: opens stats modal + fetches views (NOT the connect popup) -->
 <button class="prov" data-p="youtube" id="ytOpenStats" type="button">YouTube</button>
 <button class="prov" data-p="tiktok" type="button">TikTok</button>
@@ -1525,7 +1525,7 @@
 </div>
 <!-- ✅ Optional: tiny helper text under YouTube -->
 <p class="tiny muted" style="margin:10px 0 0">
-          SoundCloud-only test: connect SoundCloud, check agreement, then Analyze
+          Connect Instagram, SoundCloud, or both. Then check agreement and click Analyze.
         </p>
 </div>
 </div>
@@ -4812,6 +4812,17 @@ const MB_API_ENDPOINTS = {
         console.error('SoundCloud OAuth start failed:', error);
         mbShowSoundCloudStatus(error?.message || 'Could not start SoundCloud login.', false);
       });
+      return;
+    }
+
+    if (providerKey === 'instagram') {
+      btn.classList.add('active');
+      try { localStorage.setItem('mb_pending_provider', 'instagram'); } catch (e) {}
+      if (typeof window.mbStartInstagramOauth === 'function') {
+        window.mbStartInstagramOauth();
+      } else {
+        openConnect(providerKeyRaw);
+      }
       return;
     }
 
@@ -8861,7 +8872,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
   clearPreview();
 })();
 </script>
-<!-- Instagram OAuth removed for SoundCloud-only test. -->
+<!-- Instagram OAuth restored with safe provider controller. -->
 
 <script id="mb-soundcloud-only-callback-and-analyze">
 ;(function(){
@@ -9047,22 +9058,8 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     if (btn) {
       btn.disabled = false;
       btn.removeAttribute('disabled');
-      btn.addEventListener('click', function(e){
-        var scBtn = qs('#ai .providers .prov[data-p="soundcloud"]');
-        var hasToken = false;
-        try { hasToken = !!localStorage.getItem('mb_soundcloud_access_token'); } catch(err){}
-        if (!(hasToken || (scBtn && scBtn.classList.contains('active')))) return;
-        var agree = qs('#agree');
-        if (agree && !agree.checked) return;
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
-        window.mbAnalyzeSoundCloudOnly().catch(function(err){
-          console.error('SoundCloud analyze failed:', err);
-          showStatus('SoundCloud analyze failed: ' + (err && err.message ? err.message : 'Unknown error'), false);
-          alert('SoundCloud analyze failed: ' + (err && err.message ? err.message : 'Unknown error'));
-        });
-      }, true);
+      // Analyze is handled by the unified provider controller below.
+      // Do not attach a SoundCloud-only click hijacker here.
     }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once:true });
@@ -9217,11 +9214,272 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
 </style>
 
 
-<!-- Instagram analyze failsafe removed for SoundCloud-only test. -->
+<!-- Old Instagram analyze failsafe intentionally removed. Safe provider controller handles Analyze. -->
 
 
 
-<!-- Instagram strong analyze failsafe removed for SoundCloud-only test. -->
+<!-- Old Instagram strong failsafe intentionally removed. Safe provider controller handles Analyze. -->
+
+
+<script id="mb-safe-provider-controller-instagram-soundcloud">
+;(function(){
+  var BACKEND = 'https://musixblvd.onrender.com';
+  var INSTAGRAM_APP_ID = '3223245321188975';
+
+  function qs(sel){ return document.querySelector(sel); }
+  function qsa(sel){ return Array.prototype.slice.call(document.querySelectorAll(sel)); }
+  function esc(v){ return String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+  function saveJson(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+  function loadJson(k, f){ try { var raw = localStorage.getItem(k); return raw ? JSON.parse(raw) : f; } catch(e){ return f; } }
+  function save(k,v){ try { localStorage.setItem(k, v); } catch(e){} }
+  function load(k,f){ try { var v = localStorage.getItem(k); return v == null ? f : v; } catch(e){ return f; } }
+
+  function showScan(on){
+    var modal = qs('#scanModal');
+    if (!modal) return;
+    modal.classList.toggle('hidden', !on);
+    modal.style.display = on ? 'grid' : '';
+  }
+
+  function setStatus(id, message, ok){
+    var startBtn = qs('#startAnalysis');
+    var el = qs('#' + id);
+    if (!el) {
+      el = document.createElement('p');
+      el.id = id;
+      el.className = 'tiny muted';
+      el.style.margin = '10px 0 0';
+      if (startBtn && startBtn.parentElement) startBtn.parentElement.insertAdjacentElement('afterend', el);
+    }
+    el.innerHTML = message || '';
+    el.style.color = ok === false ? '#b91c1c' : '#64748b';
+  }
+
+  async function postJson(path, body){
+    var res = await fetch(BACKEND + path, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Accept':'application/json' },
+      body: JSON.stringify(body || {})
+    });
+    var data = await res.json().catch(function(){ return {}; });
+    if (!res.ok) {
+      var msg = data.error_description || data.error_message || data.error || data.message || ('Request failed: ' + path + ' (' + res.status + ')');
+      console.error('Provider backend error:', path, data);
+      throw new Error(msg);
+    }
+    return data;
+  }
+
+  function getInstagramRedirectUri(){
+    var isLocal = /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname || '');
+    return isLocal ? (window.location.origin + (window.location.pathname || '/dashboard.html')) : 'https://musixblvd.com/dashboard.html';
+  }
+
+  function instagramOauthUrl(){
+    var state = 'mbig_' + Date.now();
+    save('mb_pending_provider', 'instagram');
+    save('mb_instagram_oauth_state', state);
+    var params = new URLSearchParams({
+      enable_fb_login:'0',
+      force_authentication:'1',
+      client_id: INSTAGRAM_APP_ID,
+      redirect_uri: getInstagramRedirectUri(),
+      response_type:'code',
+      scope:'instagram_business_basic',
+      state: state
+    });
+    return 'https://www.instagram.com/oauth/authorize?' + params.toString();
+  }
+
+  window.mbStartInstagramOauth = function(){
+    window.location.href = instagramOauthUrl();
+  };
+
+  async function fetchInstagramBundle(accessToken){
+    var profile = await postJson('/api/instagram/profile', { access_token: accessToken });
+    var media = null, insights = null;
+    try { media = await postJson('/api/instagram/media', { access_token: accessToken }); } catch(e){ console.warn('Instagram media failed:', e); }
+    try { insights = await postJson('/api/instagram/insights', { access_token: accessToken, user_id: profile && (profile.user_id || profile.id) }); } catch(e){ console.warn('Instagram insights failed:', e); }
+    saveJson('mb_instagram_profile', profile || {});
+    if (media) saveJson('mb_instagram_media', media || {});
+    if (insights) saveJson('mb_instagram_insights', insights || {});
+    return { profile: profile || {}, media: media || {}, insights: insights || {} };
+  }
+
+  async function finishInstagramOauth(code){
+    setStatus('mbInstagramStatus', 'Finishing Instagram connection...', true);
+    var tokenData = await postJson('/api/instagram/exchange-code', { code: code, redirect_uri: getInstagramRedirectUri(), redirectUri: getInstagramRedirectUri() });
+    var token = tokenData && tokenData.access_token;
+    if (!token) throw new Error('Instagram did not return an access token.');
+    save('mb_instagram_access_token', token);
+    if (tokenData.user_id) save('mb_instagram_user_id', String(tokenData.user_id));
+    var bundle = await fetchInstagramBundle(token);
+    var igBtn = qs('#ai .providers .prov[data-p="instagram"]');
+    if (igBtn) igBtn.classList.add('active');
+    try {
+      var p = loadJson('mb_profile', {});
+      p.socialConnected = p.socialConnected || {};
+      p.socialConnected.ig = true;
+      p.socialConnected.instagram = true;
+      if (bundle.profile && bundle.profile.username) {
+        p.socialUrls = p.socialUrls || {};
+        p.socialUrls.instagram = 'https://instagram.com/' + bundle.profile.username;
+      }
+      saveJson('mb_profile', p);
+      document.dispatchEvent(new CustomEvent('mb:profile-updated', { detail:p }));
+    } catch(e){}
+    setStatus('mbInstagramStatus', 'Instagram connected: <strong>' + esc(bundle.profile.username || 'account') + '</strong>.', true);
+    try { localStorage.removeItem('mb_pending_provider'); } catch(e){}
+  }
+
+  function instagramHasData(){
+    return !!(load('mb_instagram_access_token','') || (loadJson('mb_instagram_profile', {}) || {}).username);
+  }
+
+  function soundcloudHasData(){
+    return !!(load('mb_soundcloud_access_token','') || loadJson('mb_soundcloud_api_stats', null) || loadJson('mb_soundcloud_profile', null));
+  }
+
+  function renderInstagramResults(bundle){
+    bundle = bundle || {};
+    var profile = bundle.profile || loadJson('mb_instagram_profile', {}) || {};
+    var media = bundle.media || loadJson('mb_instagram_media', {}) || {};
+    var insights = bundle.insights || loadJson('mb_instagram_insights', {}) || {};
+    var results = qs('#aiResults');
+    var signals = qs('#signalsList');
+    var moves = qs('#movesList');
+    var plan = qs('#planBox');
+    var advice = qs('#manualAdviceBox');
+    var pro = qs('#proInsightsBox');
+    var followers = profile.followers_count;
+    var mediaCount = profile.media_count;
+    var username = profile.username || 'Instagram account';
+
+    if (results) results.classList.remove('hidden');
+    if (signals) {
+      signals.innerHTML =
+        '<li><strong>Instagram connected:</strong> @' + esc(username) + '</li>' +
+        '<li><strong>Followers:</strong> ' + esc(followers == null ? '—' : Number(followers).toLocaleString()) + '</li>' +
+        '<li><strong>Media count:</strong> ' + esc(mediaCount == null ? '—' : Number(mediaCount).toLocaleString()) + '</li>';
+    }
+    if (moves) {
+      moves.innerHTML =
+        '<li>Turn your strongest Instagram post into a Reel, Story, and short caption post.</li>' +
+        '<li>Use the same song/clip across Instagram and SoundCloud so both audiences connect.</li>' +
+        '<li>Watch comments and saves because those tell you what content people actually care about.</li>';
+    }
+    if (plan) {
+      plan.textContent =
+        'Instagram plan:\n' +
+        'Day 1: Post a Reel with the hook in the first 2 seconds.\n' +
+        'Day 2: Post behind-the-scenes content.\n' +
+        'Day 3: Ask a question in Stories.\n' +
+        'Day 4: Repost the best clip with a new caption.\n' +
+        'Day 5: Direct people to your best SoundCloud track or playlist.';
+    }
+    if (advice) {
+      advice.innerHTML = '<div style="padding:12px;border:1px solid #dbeafe;border-radius:12px;background:#f8fbff;color:#334155;font-weight:700;line-height:1.5;">Instagram API data loaded. Account: @' + esc(username) + '.</div>';
+    }
+    if (pro) {
+      pro.innerHTML = '<div>• Strong creators reuse one winning idea in multiple formats instead of starting from zero every day.</div><div>• They connect social content directly to one track, playlist, or release goal.</div>';
+    }
+  }
+
+  async function analyzeInstagram(){
+    var token = load('mb_instagram_access_token','');
+    var bundle;
+    if (token) bundle = await fetchInstagramBundle(token);
+    else if (instagramHasData()) bundle = { profile: loadJson('mb_instagram_profile', {}), media: loadJson('mb_instagram_media', {}), insights: loadJson('mb_instagram_insights', {}) };
+    else throw new Error('No Instagram token or saved profile found. Connect Instagram first.');
+    renderInstagramResults(bundle);
+    return bundle;
+  }
+
+  function selectedProviders(){
+    return qsa('#ai .providers .prov.active').map(function(btn){
+      return String(btn.getAttribute('data-p') || '').trim().toLowerCase();
+    }).filter(Boolean);
+  }
+
+  async function finishOauthIfNeeded(){
+    var params = new URLSearchParams(window.location.search || '');
+    var code = params.get('code');
+    if (!code) return;
+
+    var state = params.get('state') || '';
+    var pending = load('mb_pending_provider','');
+    var scState = load('mb_soundcloud_oauth_state','');
+    var isSoundCloud = pending === 'soundcloud' || (state && scState && state === scState);
+    var isInstagram = pending === 'instagram' || /^mbig_/.test(state);
+
+    if (isSoundCloud) {
+      // Let the working SoundCloud callback handle this. It already runs in the SoundCloud module.
+      return;
+    }
+
+    if (isInstagram) {
+      try {
+        await finishInstagramOauth(code);
+      } catch(e) {
+        console.error('Instagram OAuth finish failed:', e);
+        setStatus('mbInstagramStatus', 'Instagram callback failed: ' + esc(e && e.message ? e.message : 'Unknown error'), false);
+      }
+      params.delete('code'); params.delete('state'); params.delete('error'); params.delete('error_description'); params.delete('error_reason');
+      var clean = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
+      window.history.replaceState({}, document.title, clean);
+    }
+  }
+
+  function install(){
+    finishOauthIfNeeded();
+
+    var start = qs('#startAnalysis');
+    if (start) {
+      start.disabled = false;
+      start.removeAttribute('disabled');
+
+      start.addEventListener('click', function(e){
+        var agree = qs('#agree');
+        if (agree && !agree.checked) return;
+
+        var selected = selectedProviders();
+        var shouldRunInstagram = selected.indexOf('instagram') >= 0 || (selected.length === 0 && instagramHasData());
+        var shouldRunSoundCloud = selected.indexOf('soundcloud') >= 0 || (selected.length === 0 && soundcloudHasData());
+
+        if (!shouldRunInstagram && !shouldRunSoundCloud) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+
+        showScan(true);
+        (async function(){
+          var ran = [];
+          if (shouldRunSoundCloud) {
+            if (typeof window.mbAnalyzeSoundCloudOnly !== 'function') throw new Error('SoundCloud analyzer is not loaded.');
+            await window.mbAnalyzeSoundCloudOnly();
+            ran.push('SoundCloud');
+          }
+          if (shouldRunInstagram) {
+            await analyzeInstagram();
+            ran.push('Instagram');
+          }
+          setStatus('mbUnifiedAnalyzeStatus', 'Analyzed: <strong>' + esc(ran.join(' + ')) + '</strong>.', true);
+        })().catch(function(err){
+          console.error('Unified Analyze failed:', err);
+          setStatus('mbUnifiedAnalyzeStatus', 'Analyze failed: ' + esc(err && err.message ? err.message : 'Unknown error'), false);
+          alert('Analyze failed: ' + (err && err.message ? err.message : 'Unknown error'));
+        }).finally(function(){
+          showScan(false);
+        });
+      }, true);
+    }
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once:true });
+  else install();
+})();
+</script>
 
 </body>
 </html>
