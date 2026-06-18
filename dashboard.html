@@ -1496,13 +1496,13 @@
 <div class="ai-robot">
 <img alt="MusixBlvd AI Bot" class="mic-mascot" src="images/boulevard.png"/>
 <div class="ai-hero-copy">
-<h2>Let’s analyze your socials</h2>
+<h2>Let’s analyze SoundCloud</h2><p class="tiny" style="margin:6px 0 0;color:#0369a1;font-weight:800;">SoundCloud-only test build — Instagram logic is disabled in this file.</p>
 <p class="muted">
           Grant Mikey permissions and I’ll analyze your social media accounts and platforms.
         </p>
 <!-- Providers -->
 <div class="providers">
-<button class="prov" data-p="instagram" type="button">Instagram</button>
+<!-- Instagram removed for SoundCloud-only test -->
 <!-- ✅ YouTube: opens stats modal + fetches views (NOT the connect popup) -->
 <button class="prov" data-p="youtube" id="ytOpenStats" type="button">YouTube</button>
 <button class="prov" data-p="tiktok" type="button">TikTok</button>
@@ -8930,388 +8930,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
   clearPreview();
 })();
 </script>
-<script>
-;(function () {
-  const MB_INSTAGRAM_APP_ID = '3223245321188975';
-
-  function mbGetInstagramRedirectUri() {
-    const isLocal = /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname || '');
-    const localPath = window.location.pathname || '/dashboard.html';
-    if (isLocal) return window.location.origin + localPath;
-    return 'https://musixblvd.com/dashboard.html';
-  }
-
-  function mbInstagramOauthUrl() {
-    const redirectUri = mbGetInstagramRedirectUri();
-    const state = 'mbig_' + Date.now();
-    try { localStorage.setItem('mb_instagram_oauth_state', state); } catch (e) {}
-
-    const params = new URLSearchParams({
-      enable_fb_login: '0',
-      force_authentication: '1',
-      client_id: MB_INSTAGRAM_APP_ID,
-      redirect_uri: redirectUri,
-      response_type: 'code',
-      scope: 'instagram_business_basic',
-      state
-    });
-
-    return 'https://www.instagram.com/oauth/authorize?' + params.toString();
-  }
-
-  function mbStartInstagramOauth() {
-    window.location.href = mbInstagramOauthUrl();
-  }
-
-  function mbShowInstagramStatus(msg, ok) {
-    // IMPORTANT: connecting Instagram should NOT reveal the results area.
-    // Results are only shown after the user clicks "Analyze my socials".
-    try { localStorage.setItem('mb_instagram_status_html', msg); } catch (e) {}
-    const box = document.getElementById('manualAdviceBox');
-    const results = document.getElementById('aiResults');
-    if (box && results && !results.classList.contains('hidden')) {
-      box.innerHTML = '<div style="padding:10px 12px;border:1px solid ' + (ok ? '#bbf7d0' : '#fecaca') + ';border-radius:12px;background:' + (ok ? '#ecfdf3' : '#fef2f2') + ';color:' + (ok ? '#166534' : '#b91c1c') + ';font-weight:700;line-height:1.5;">' + msg + '</div>';
-    }
-  }
-
-  function mbEscapeHtml(value) {
-    return String(value == null ? '' : value)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
-  function mbSetInstagramActive(isOn) {
-    const btn = document.querySelector('#ai .providers .prov[data-p="instagram"]');
-    if (btn) btn.classList.toggle('active', !!isOn);
-    const start = document.getElementById('startAnalysis');
-    const agree = document.getElementById('agree');
-    const anySel = !!document.querySelector('#ai .providers .prov.active');
-    if (start) start.disabled = !(agree?.checked && anySel);
-  }
-
-  function mbPersistInstagramConnection(profileData) {
-    try {
-      const profile = JSON.parse(localStorage.getItem('mb_profile') || '{}');
-      profile.socialConnected = profile.socialConnected || {};
-      profile.socialUrls = profile.socialUrls || {};
-      profile.socialConnected.ig = true;
-      if (profileData?.username) {
-        profile.socialUrls.instagram = 'https://instagram.com/' + profileData.username;
-      }
-      localStorage.setItem('mb_profile', JSON.stringify(profile));
-      document.dispatchEvent(new CustomEvent('mb:profile-updated', { detail: profile }));
-    } catch (e) {
-      console.warn('Could not persist Instagram connection', e);
-    }
-  }
-
-  async function mbExchangeInstagramCode(code) {
-    const resp = await fetch('https://musixblvd.onrender.com/api/instagram/exchange-code', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        code,
-        redirect_uri: mbGetInstagramRedirectUri(),
-        redirectUri: mbGetInstagramRedirectUri(),
-        redirect_url: mbGetInstagramRedirectUri()
-      })
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      throw new Error(data?.error_message || data?.error || 'Instagram token exchange failed.');
-    }
-    return data;
-  }
-
-  async function mbFetchInstagramProfile(accessToken) {
-    const resp = await fetch('https://musixblvd.onrender.com/api/instagram/profile', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ access_token: accessToken })
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      throw new Error(data?.error_message || data?.error || 'Instagram profile fetch failed.');
-    }
-    return data;
-  }
-
-  async function mbFetchInstagramMedia(accessToken) {
-    const resp = await fetch('https://musixblvd.onrender.com/api/instagram/media', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ access_token: accessToken })
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      console.warn('Instagram media fetch skipped:', data);
-      return null;
-    }
-    return data;
-  }
-
-  async function mbFetchInstagramInsights(accessToken, userId) {
-    if (!userId) return null;
-    const resp = await fetch('https://musixblvd.onrender.com/api/instagram/insights', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ access_token: accessToken, user_id: String(userId) })
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      console.warn('Instagram insights fetch skipped:', data);
-      return null;
-    }
-    return data;
-  }
-
-  function mbFormatInsightValue(metric) {
-    if (!metric) return '—';
-    const tv = metric.total_value;
-    if (tv && typeof tv.value !== 'undefined') return String(tv.value);
-    const vals = Array.isArray(metric.values) ? metric.values : [];
-    if (vals.length && typeof vals[0]?.value !== 'undefined') return String(vals[0].value);
-    return '—';
-  }
-
-  function mbRenderInstagramProfile(profileData, mediaData, insightsData, revealResults = true) {
-    const results = document.getElementById('aiResults');
-    const signalsList = document.getElementById('signalsList');
-    const movesList = document.getElementById('movesList');
-    const planBox = document.getElementById('planBox');
-    const proInsightsBox = document.getElementById('proInsightsBox');
-
-    if (results && revealResults) results.classList.remove('hidden');
-
-    const mediaItems = Array.isArray(mediaData?.data) ? mediaData.data : [];
-    const insightItems = Array.isArray(insightsData?.data) ? insightsData.data : [];
-    const insightMap = Object.fromEntries(insightItems.map((item) => [item?.name, item]));
-    const followers = profileData?.followers_count;
-    const following = profileData?.follows_count;
-    const mediaCount = profileData?.media_count;
-    const bio = profileData?.biography;
-    const website = profileData?.website;
-    const reach = mbFormatInsightValue(insightMap.accounts_reached);
-    const engaged = mbFormatInsightValue(insightMap.accounts_engaged);
-    const interactions = mbFormatInsightValue(insightMap.total_interactions);
-    const views = mbFormatInsightValue(insightMap.views);
-
-    if (signalsList) {
-      const rows = [
-        '<li><strong>Instagram username:</strong> ' + mbEscapeHtml(profileData?.username || '—') + '</li>',
-        '<li><strong>Instagram user ID:</strong> ' + mbEscapeHtml(profileData?.user_id || '—') + '</li>',
-        '<li><strong>Account type:</strong> ' + mbEscapeHtml(profileData?.account_type || '—') + '</li>',
-        '<li><strong>Followers:</strong> ' + mbEscapeHtml(typeof followers === 'undefined' ? '—' : followers) + '</li>',
-        '<li><strong>Following:</strong> ' + mbEscapeHtml(typeof following === 'undefined' ? '—' : following) + '</li>',
-        '<li><strong>Media count:</strong> ' + mbEscapeHtml(typeof mediaCount === 'undefined' ? '—' : mediaCount) + '</li>',
-        '<li><strong>Accounts reached:</strong> ' + mbEscapeHtml(reach) + '</li>',
-        '<li><strong>Accounts engaged:</strong> ' + mbEscapeHtml(engaged) + '</li>',
-        '<li><strong>Total interactions:</strong> ' + mbEscapeHtml(interactions) + '</li>',
-        '<li><strong>Views:</strong> ' + mbEscapeHtml(views) + '</li>'
-      ];
-      if (bio) rows.push('<li><strong>Bio:</strong> ' + mbEscapeHtml(bio) + '</li>');
-      if (website) rows.push('<li><strong>Website:</strong> <a href="' + mbEscapeHtml(website) + '" target="_blank" rel="noopener">' + mbEscapeHtml(website) + '</a></li>');
-      signalsList.innerHTML = rows.join('');
-    }
-
-    if (movesList) {
-      const moves = [];
-      if (typeof followers !== 'undefined') {
-        moves.push('<li>Your follower count is <strong>' + mbEscapeHtml(followers) + '</strong>. Keep track of this week to week so MIKEY can spot growth or drop-offs.</li>');
-      } else {
-        moves.push('<li>Your Instagram login is connected, but follower count was not returned on this request.</li>');
-      }
-      if (typeof mediaCount !== 'undefined') {
-        moves.push('<li>You have <strong>' + mbEscapeHtml(mediaCount) + '</strong> published media items. Consistent posting usually matters more than random bursts.</li>');
-      }
-      if (reach !== '—' || engaged !== '—') {
-        moves.push('<li>Reach is <strong>' + mbEscapeHtml(reach) + '</strong> and engaged accounts are <strong>' + mbEscapeHtml(engaged) + '</strong>. That gives MIKEY something real to coach from.</li>');
-      } else {
-        moves.push('<li>Insights did not fully return yet, so the next best move is to compare followers, posting frequency, and recent content quality.</li>');
-      }
-      if (mediaItems.length) {
-        moves.push('<li>MusixBlvd pulled recent Instagram media, so we can start turning actual posts into feedback and content advice.</li>');
-      }
-      movesList.innerHTML = moves.join('');
-    }
-
-    if (planBox) {
-      const lines = [
-        'Instagram connected successfully.',
-        'Username: ' + (profileData?.username || '—'),
-        'User ID: ' + (profileData?.user_id || '—'),
-        'Account type: ' + (profileData?.account_type || '—'),
-        'Followers: ' + (typeof followers === 'undefined' ? '—' : followers),
-        'Following: ' + (typeof following === 'undefined' ? '—' : following),
-        'Media count: ' + (typeof mediaCount === 'undefined' ? '—' : mediaCount),
-        'Accounts reached: ' + reach,
-        'Accounts engaged: ' + engaged,
-        'Total interactions: ' + interactions,
-        'Views: ' + views,
-        '',
-        'Next step:',
-        mediaItems.length
-          ? 'Use your recent posts and counts to shape stronger posting advice.'
-          : 'Pull more media and compare weekly changes for better advice.'
-      ];
-      planBox.textContent = lines.join('\n');
-    }
-
-    if (proInsightsBox) {
-      const mediaHtml = mediaItems.length
-        ? '<div style="margin-top:10px;display:grid;gap:8px;">' + mediaItems.slice(0, 4).map((item, index) => {
-            const caption = (item?.caption || '').trim();
-            return '<div style="padding:10px 12px;border:1px solid #dbeafe;border-radius:12px;background:#ffffff;color:#1e3a8a;line-height:1.5;">' +
-              '<strong>Recent post ' + (index + 1) + ':</strong> ' +
-              mbEscapeHtml(caption ? caption.slice(0, 120) : (item?.media_type || 'Post')) +
-              (item?.permalink ? ' <a href="' + mbEscapeHtml(item.permalink) + '" target="_blank" rel="noopener">Open</a>' : '') +
-              '</div>';
-          }).join('') + '</div>'
-        : '<div style="margin-top:10px;color:#1e3a8a;">No recent media was returned yet.</div>';
-
-      proInsightsBox.innerHTML =
-        '<div style="padding:10px 12px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;color:#1d4ed8;font-weight:700;line-height:1.6;">' +
-        'Instagram connected with live account data.' +
-        '<br>Followers: <strong>' + mbEscapeHtml(typeof followers === 'undefined' ? '—' : followers) + '</strong>' +
-        ' • Reach: <strong>' + mbEscapeHtml(reach) + '</strong>' +
-        ' • Engagement: <strong>' + mbEscapeHtml(engaged) + '</strong>' +
-        '<br>MIKEY advice: keep posting consistently, reuse content formats that already got reach, and turn your strongest recent post into a repeatable series.' +
-        mediaHtml +
-        '</div>';
-    }
-  }
-
-  window.mbRenderSavedInstagramResults = function () {
-    try {
-      const profileData = JSON.parse(localStorage.getItem('mb_instagram_profile') || 'null');
-      if (!profileData || !profileData.username) return false;
-      const mediaData = JSON.parse(localStorage.getItem('mb_instagram_media') || 'null');
-      const insightsData = JSON.parse(localStorage.getItem('mb_instagram_insights') || 'null');
-      mbRenderInstagramProfile(profileData, mediaData, insightsData, true);
-      return true;
-    } catch (e) {
-      console.warn('Could not render saved Instagram results', e);
-      return false;
-    }
-  };
-
-  window.mbRenderInstagramProfile = mbRenderInstagramProfile;
-
-
-  async function mbHandleInstagramCallback(code) {
-    mbShowInstagramStatus('Instagram login connected. Exchanging code with your backend...', true);
-    try {
-      const tokenData = await mbExchangeInstagramCode(code);
-      const accessToken = tokenData?.access_token;
-      if (!accessToken) {
-        throw new Error('Instagram did not return an access token.');
-      }
-
-      try { localStorage.setItem('mb_instagram_access_token', accessToken); } catch (e) {}
-      if (tokenData?.user_id) {
-        try { localStorage.setItem('mb_instagram_user_id', String(tokenData.user_id)); } catch (e) {}
-      }
-
-      mbShowInstagramStatus('Instagram token received. Pulling first profile data...', true);
-
-      const profileData = await mbFetchInstagramProfile(accessToken);
-      try { localStorage.setItem('mb_instagram_profile', JSON.stringify(profileData)); } catch (e) {}
-
-      const mediaData = await mbFetchInstagramMedia(accessToken);
-      const insightsData = await mbFetchInstagramInsights(accessToken, profileData?.user_id || tokenData?.user_id);
-
-      try { localStorage.setItem('mb_instagram_media', JSON.stringify(mediaData || {})); } catch (e) {}
-      try { localStorage.setItem('mb_instagram_insights', JSON.stringify(insightsData || {})); } catch (e) {}
-
-      mbPersistInstagramConnection(profileData);
-      mbSetInstagramActive(true);
-      // Save Instagram data only. Do not render results until Analyze my socials is clicked.
-      mbShowInstagramStatus(
-        'Instagram connected. Username: <strong>' + mbEscapeHtml(profileData?.username || '—') + '</strong> • Followers: <strong>' + mbEscapeHtml(typeof profileData?.followers_count === 'undefined' ? '—' : profileData.followers_count) + '</strong> • Account type: <strong>' + mbEscapeHtml(profileData?.account_type || '—') + '</strong>',
-        true
-      );
-    } catch (error) {
-      console.error('Instagram callback handling failed:', error);
-      mbShowInstagramStatus('Instagram connected to the login flow, but MusixBlvd could not finish the backend step: ' + mbEscapeHtml(error?.message || 'Unknown error.'), false);
-    }
-  }
-
-  document.addEventListener('click', function (e) {
-    const igBtn = e.target.closest('#ai .providers .prov[data-p="instagram"], #igToggle');
-    if (!igBtn) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-    e.stopImmediatePropagation();
-
-    mbStartInstagramOauth();
-  }, true);
-
-  document.addEventListener('click', function (e) {
-    const saveBtn = e.target.closest('#connectSave');
-    const modal = document.getElementById('connectModal');
-    const title = document.getElementById('connectTitle');
-    if (!saveBtn || !modal || modal.classList.contains('hidden')) return;
-    const t = String(title?.textContent || '').toLowerCase();
-    if (!t.includes('instagram')) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-    e.stopImmediatePropagation();
-
-    modal.classList.add('hidden');
-    mbStartInstagramOauth();
-  }, true);
-
-  try {
-    const savedProfile = JSON.parse(localStorage.getItem('mb_instagram_profile') || 'null');
-    if (savedProfile?.username) {
-      mbSetInstagramActive(true);
-    }
-  } catch (e) {}
-
-  ;(async function () {
-    try {
-      const url = new URL(window.location.href);
-      const code = url.searchParams.get('code');
-      const err = url.searchParams.get('error');
-      const errDesc = url.searchParams.get('error_description');
-
-      if (code) {
-        const state = url.searchParams.get('state') || '';
-        const scState = localStorage.getItem('mb_soundcloud_oauth_state') || '';
-        const pendingProvider = localStorage.getItem('mb_pending_provider') || '';
-
-        if (state && scState && state === scState && pendingProvider === 'soundcloud') {
-          await mbFinishSoundCloudOauth(code);
-        } else {
-          try { localStorage.setItem('mb_instagram_auth_code', code); } catch (e) {}
-          await mbHandleInstagramCallback(code);
-        }
-
-        url.searchParams.delete('code');
-        url.searchParams.delete('state');
-        url.searchParams.delete('error');
-        url.searchParams.delete('error_reason');
-        url.searchParams.delete('error_description');
-        window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : '') + url.hash);
-      } else if (err) {
-        mbShowInstagramStatus('Instagram login error: ' + mbEscapeHtml(errDesc || err), false);
-        url.searchParams.delete('error');
-        url.searchParams.delete('error_reason');
-        url.searchParams.delete('error_description');
-        url.searchParams.delete('state');
-        window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : '') + url.hash);
-      }
-    } catch (e) {
-      console.warn('Instagram OAuth patch readback failed', e);
-    }
-  })();
-})();
-</script>
+<!-- Instagram OAuth logic removed for SoundCloud-only test -->
 <script id="mb-terms-final-failsafe">
 ;(function(){
   function ready(fn){
@@ -9459,187 +9078,38 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
 </style>
 
 
-<script id="mb-instagram-analyze-button-failsafe">
+<!-- Instagram analyze failsafe removed for SoundCloud-only test -->
+<script id="mb-soundcloud-only-analyze-test">
 ;(function(){
-  // Instagram analyze failsafe — appended only, does not replace existing website code.
   var BACKEND = 'https://musixblvd.onrender.com';
+  var REDIRECT_URI = 'https://musixblvd.com/dashboard.html';
 
-  function qs(sel){ return document.querySelector(sel); }
-  function safeParse(raw, fallback){
-    try { return JSON.parse(raw || 'null') || fallback; } catch(e){ return fallback; }
-  }
-  function hasInstagramData(){
-    var token = '';
-    var profile = null;
-    try { token = localStorage.getItem('mb_instagram_access_token') || ''; } catch(e) {}
-    try { profile = safeParse(localStorage.getItem('mb_instagram_profile'), null); } catch(e) {}
-    return !!(token || (profile && profile.username));
-  }
-  function ensureInstagramActive(){
-    if (!hasInstagramData()) return;
-    var btn = qs('#ai .providers .prov[data-p="instagram"]');
-    if (btn) btn.classList.add('active');
-    var start = qs('#startAnalysis');
-    var agree = qs('#agree');
-    var anyActive = !!qs('#ai .providers .prov.active');
-    if (start && agree && agree.checked && anyActive) start.disabled = false;
-  }
+  function qs(s){ return document.querySelector(s); }
+  function qsa(s){ return Array.prototype.slice.call(document.querySelectorAll(s)); }
+  function load(k, fallback){ try { var v = localStorage.getItem(k); return v == null ? fallback : v; } catch(e){ return fallback; } }
+  function save(k, v){ try { localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v)); } catch(e){} }
+  function parseJSON(raw, fallback){ try { return raw ? JSON.parse(raw) : fallback; } catch(e){ return fallback; } }
+  function esc(v){ return String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+  function num(n){ return Number(n || 0).toLocaleString(); }
+
   function showScan(on){
     var modal = qs('#scanModal');
     if (!modal) return;
     modal.classList.toggle('hidden', !on);
     modal.style.display = on ? 'grid' : '';
   }
-  async function postJson(path, body){
-    var res = await fetch(BACKEND + path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body || {})
-    });
-    var data = await res.json().catch(function(){ return {}; });
-    if (!res.ok) throw new Error(data.error || data.message || data.error_message || ('Request failed: ' + path));
-    return data;
-  }
-  function renderSavedFallback(){
-    if (typeof window.mbRenderSavedInstagramResults === 'function') {
-      try { return window.mbRenderSavedInstagramResults(); } catch(e) { console.warn(e); }
-    }
-    return false;
-  }
-  async function analyzeInstagramNow(){
-    ensureInstagramActive();
-    var token = '';
-    try { token = localStorage.getItem('mb_instagram_access_token') || ''; } catch(e) {}
-    if (!token) {
-      if (!renderSavedFallback()) {
-        alert('Instagram is not fully connected yet. Click Instagram first, allow access, then come back and press Analyze my socials.');
-      }
-      return;
-    }
 
-    showScan(true);
-    try {
-      var profile = await postJson('/api/instagram/profile', { access_token: token });
-      var media = {};
-      try {
-        media = await postJson('/api/instagram/media', { access_token: token });
-      } catch(mediaErr) {
-        console.warn('Instagram media failed; using saved media if available.', mediaErr);
-        media = safeParse(localStorage.getItem('mb_instagram_media'), {});
-      }
-
-      // No Insights dependency right now. This keeps instagram_business_basic flow clean.
-      var insights = safeParse(localStorage.getItem('mb_instagram_insights'), {});
-
-      try { localStorage.setItem('mb_instagram_profile', JSON.stringify(profile || {})); } catch(e) {}
-      try { localStorage.setItem('mb_instagram_media', JSON.stringify(media || {})); } catch(e) {}
-
-      if (typeof window.mbRenderInstagramProfile === 'function') {
-        window.mbRenderInstagramProfile(profile || {}, media || {}, insights || {}, true);
-      } else if (!renderSavedFallback()) {
-        console.log('Instagram profile:', profile);
-        console.log('Instagram media:', media);
-        alert('Instagram data loaded, but the dashboard renderer was not found. Check console for profile/media data.');
-      }
-    } catch(err) {
-      console.error('Instagram analyze failed:', err);
-      if (!renderSavedFallback()) {
-        alert('Instagram connected, but stats could not load: ' + (err && err.message ? err.message : 'Unknown error'));
-      }
-    } finally {
-      showScan(false);
+  function showStatus(message, ok){
+    console.log('[SoundCloud only]', message);
+    var results = qs('#aiResults');
+    var advice = qs('#manualAdviceBox');
+    if (results) results.classList.remove('hidden');
+    if (advice) {
+      advice.innerHTML = '<div style="padding:12px;border:1px solid ' + (ok ? '#bbf7d0' : '#fecaca') + ';border-radius:12px;background:' + (ok ? '#ecfdf3' : '#fef2f2') + ';color:' + (ok ? '#166534' : '#b91c1c') + ';font-weight:800;line-height:1.5;">' + esc(message) + '</div>';
     }
   }
 
-  function ready(fn){
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn, { once:true });
-    else fn();
-  }
-
-  ready(function(){
-    ensureInstagramActive();
-    var agree = qs('#agree');
-    if (agree) agree.addEventListener('change', ensureInstagramActive);
-
-    // Run a few times because other existing scripts also restore provider buttons after load.
-    var tries = 0;
-    var timer = setInterval(function(){
-      ensureInstagramActive();
-      tries += 1;
-      if (tries > 10) clearInterval(timer);
-    }, 500);
-
-    document.addEventListener('click', function(e){
-      var start = e.target && e.target.closest ? e.target.closest('#startAnalysis') : null;
-      if (!start) return;
-
-      // Do NOT let the Instagram failsafe steal the Analyze click when SoundCloud is selected/connected.
-      var scActive = !!qs('#ai .providers .prov[data-p="soundcloud"].active');
-      var scPending = false;
-      var scReady = false;
-      try { scPending = localStorage.getItem('mb_pending_provider') === 'soundcloud'; } catch(e) {}
-      try {
-        scReady = !!(
-          localStorage.getItem('mb_soundcloud_access_token') ||
-          localStorage.getItem('mb_soundcloud_api_stats') ||
-          localStorage.getItem('mb_soundcloud_profile') ||
-          localStorage.getItem('mb_soundcloud_tracks')
-        );
-      } catch(e) {}
-      if (scActive || scPending || scReady) return;
-
-      var igActive = !!qs('#ai .providers .prov[data-p="instagram"].active') || hasInstagramData();
-      if (!igActive) return; // Leave every non-Instagram social exactly alone.
-
-      var agreeBox = qs('#agree');
-      if (agreeBox && !agreeBox.checked) return;
-
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-      analyzeInstagramNow();
-    }, true);
-  });
-})();
-</script>
-
-
-
-<script id="mb-analyze-socials-strong-failsafe-v2">
-;(function(){
-  var BACKEND = 'https://musixblvd.onrender.com';
-  var SC_BACKEND = BACKEND;
-  var REDIRECT_URI = 'https://musixblvd.com/dashboard.html';
-
-  function qs(s){ return document.querySelector(s); }
-  function qsa(s){ return Array.prototype.slice.call(document.querySelectorAll(s)); }
-  function parseJson(x, fallback){ try { return JSON.parse(x); } catch(e){ return fallback; } }
-  function save(k,v){ try { localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v)); } catch(e){} }
-  function load(k, fallback){ try { var v=localStorage.getItem(k); return v == null ? fallback : v; } catch(e){ return fallback; } }
-  function mbLocalEscape(value){ return String(value == null ? '' : value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&#39;'); }
-
-  function hasInstagramConnection(){
-    var token = load('mb_instagram_access_token','');
-    var profile = parseJson(load('mb_instagram_profile','{}'), {});
-    var profileMain = parseJson(load('mb_profile','{}'), {});
-    return !!(token || profile.username || (profileMain.socialConnected && (profileMain.socialConnected.ig || profileMain.socialConnected.instagram)));
-  }
-
-  function markInstagramConnected(reason){
-    var ig = qs('#ai .providers .prov[data-p="instagram"]');
-    if (ig) ig.classList.add('active');
-    try {
-      var p = parseJson(localStorage.getItem('mb_profile') || '{}', {});
-      p.socialConnected = p.socialConnected || {};
-      p.socialConnected.ig = true;
-      p.socialConnected.instagram = true;
-      localStorage.setItem('mb_profile', JSON.stringify(p));
-      document.dispatchEvent(new CustomEvent('mb:profile-updated', { detail:p }));
-    } catch(e){}
-    unlockAnalyze(reason || 'instagram');
-  }
-
-  function unlockAnalyze(reason){
+  function unlockAnalyze(){
     var btn = qs('#startAnalysis');
     if (!btn) return;
     btn.disabled = false;
@@ -9647,362 +9117,295 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     btn.style.pointerEvents = 'auto';
     btn.style.opacity = '1';
     btn.title = '';
-    btn.dataset.mbFailsafeUnlocked = reason || 'true';
   }
 
-  function shouldUnlock(){
-    if (hasInstagramConnection()) return true;
-    if (qs('#ai .providers .prov.active')) return true;
-    var params = new URLSearchParams(window.location.search || '');
-    if (params.get('code') || params.get('error')) return true;
-    return false;
+  function disableInstagramForTest(){
+    // Clear old Instagram active state so it cannot hijack SoundCloud testing.
+    try {
+      [
+        'mb_instagram_access_token',
+        'mb_instagram_profile',
+        'mb_instagram_media',
+        'mb_instagram_auth_code',
+        'mb_instagram_exchange_response',
+        'mb_instagram_oauth_state',
+        'mb_instagram_status_html'
+      ].forEach(function(k){ localStorage.removeItem(k); });
+    } catch(e) {}
+
+    qsa('[data-p="instagram"]').forEach(function(btn){
+      btn.classList.remove('active');
+      btn.disabled = true;
+      btn.style.display = 'none';
+      btn.setAttribute('aria-hidden','true');
+    });
+  }
+
+  function getSoundCloudTracksArray(tracks){
+    if (Array.isArray(tracks)) return tracks;
+    if (tracks && Array.isArray(tracks.collection)) return tracks.collection;
+    return [];
+  }
+
+  function buildSoundCloudStats(profile, tracks){
+    var arr = getSoundCloudTracksArray(tracks);
+    var totals = arr.reduce(function(acc, t){
+      acc.plays += Number(t.playback_count || t.play_count || t.plays_count || 0);
+      acc.likes += Number(t.favoritings_count || t.likes_count || t.like_count || 0);
+      acc.comments += Number(t.comment_count || t.comments_count || 0);
+      acc.reposts += Number(t.reposts_count || t.repost_count || 0);
+      return acc;
+    }, { plays:0, likes:0, comments:0, reposts:0 });
+
+    var followers = Number(profile.followers_count || profile.followers || 0);
+    var engagement = followers ? ((totals.likes + totals.comments + totals.reposts) / followers) * 100 : 0;
+
+    return {
+      platform: 'soundcloud',
+      date: new Date().toISOString(),
+      followers: followers,
+      posts: arr.length,
+      avgLikes: arr.length ? Math.round(totals.likes / arr.length) : 0,
+      avgComments: arr.length ? Math.round(totals.comments / arr.length) : 0,
+      avgShares: arr.length ? Math.round(totals.reposts / arr.length) : 0,
+      views: totals.plays,
+      likes: totals.likes,
+      comments: totals.comments,
+      shares: totals.reposts,
+      engagement: engagement,
+      score: Math.max(0, Math.min(10, Math.round((engagement / 10) * 10) / 10)),
+      niche: 'music'
+    };
   }
 
   async function postJson(path, body){
-    var res = await fetch(BACKEND + path, {
+    var resp = await fetch(BACKEND + path, {
       method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(body || {})
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify(body || {})
     });
-    var data = await res.json().catch(function(){ return {}; });
-    if (!res.ok) throw new Error(data.error_message || data.error || data.message || ('Request failed ' + path));
+    var txt = await resp.text();
+    var data = {};
+    try { data = txt ? JSON.parse(txt) : {}; } catch(e){ data = { error: txt || 'Invalid JSON response' }; }
+    if (!resp.ok) {
+      var msg = data.error_description || data.error_message || data.error || data.message || ('HTTP ' + resp.status + ' on ' + path);
+      throw new Error(msg);
+    }
     return data;
   }
 
-  async function retryCodeExchangeIfNeeded(){
-    var params = new URLSearchParams(window.location.search || '');
-    var code = params.get('code');
-    if (!code) return false;
-    if (load('mb_instagram_access_token','')) return true;
+  async function getJson(path){
+    var resp = await fetch(BACKEND + path);
+    var txt = await resp.text();
+    var data = {};
+    try { data = txt ? JSON.parse(txt) : {}; } catch(e){ data = { error: txt || 'Invalid JSON response' }; }
+    if (!resp.ok) {
+      var msg = data.error_description || data.error_message || data.error || data.message || ('HTTP ' + resp.status + ' on ' + path);
+      throw new Error(msg);
+    }
+    return data;
+  }
 
-    // Try the exchange again, but this time send every redirect field name your backend might read.
-    var data = await postJson('/api/instagram/exchange-code', {
+  async function startSoundCloudConnect(){
+    localStorage.setItem('mb_pending_provider', 'soundcloud');
+    var data = await getJson('/api/soundcloud/auth-url');
+    if (data.code_verifier) localStorage.setItem('mb_soundcloud_code_verifier', data.code_verifier);
+    if (data.state) localStorage.setItem('mb_soundcloud_oauth_state', data.state);
+    if (!data.auth_url) throw new Error('SoundCloud auth-url route did not return auth_url.');
+    window.location.href = data.auth_url;
+  }
+
+  async function finishSoundCloudOauth(code){
+    if (!code) throw new Error('Missing SoundCloud OAuth code.');
+    var verifier = load('mb_soundcloud_code_verifier','');
+    if (!verifier) throw new Error('Missing SoundCloud code_verifier. Click SoundCloud again and reconnect.');
+
+    showStatus('Finishing SoundCloud connection...', true);
+
+    var tokenData = await postJson('/api/soundcloud/exchange-code', {
       code: code,
-      redirect_uri: REDIRECT_URI,
-      redirectUri: REDIRECT_URI,
-      redirect_url: REDIRECT_URI,
-      redirectURL: REDIRECT_URI
+      code_verifier: verifier,
+      redirect_uri: REDIRECT_URI
     });
 
-    var token = data.access_token || data.accessToken || data.token || (data.data && data.data.access_token);
-    if (token) save('mb_instagram_access_token', token);
-    save('mb_instagram_exchange_response', data || {});
-    markInstagramConnected('exchange-success');
-    return !!token;
-  }
+    var token = tokenData.access_token || tokenData.accessToken || tokenData.token;
+    if (!token) throw new Error('SoundCloud exchange worked but no access_token came back.');
 
-  function showScan(on){
-    var modal = qs('#scanModal');
-    if (!modal) return;
-    modal.classList.toggle('hidden', !on);
-    modal.style.display = on ? 'grid' : '';
-  }
+    save('mb_soundcloud_token_response', tokenData);
+    save('mb_soundcloud_access_token', token);
+    localStorage.removeItem('mb_pending_provider');
 
-  function renderFallbackMessage(msg){
-    var results = qs('#aiResults');
-    var signals = qs('#signalsList');
-    var moves = qs('#movesList');
-    var plan = qs('#planBox');
-    var advice = qs('#manualAdviceBox');
-    if (results) results.classList.remove('hidden');
-    if (signals) signals.innerHTML = '<li><strong>Instagram connection detected.</strong> Mikey is ready to analyze once the backend returns the Instagram access token.</li>';
-    if (moves) moves.innerHTML = '<li>Post 3 Reels this week using your strongest hook in the first 2 seconds.</li><li>Turn your best performing post into a story, reel, and short caption post.</li>';
-    if (plan) plan.textContent = 'Day 1: Post a Reel with a strong hook.\nDay 2: Post behind-the-scenes content.\nDay 3: Ask followers a question in Stories.\nDay 4: Repost the best content with a new caption.\nDay 5: Collaborate or tag one related creator.';
-    if (advice) advice.innerHTML = '<div style="padding:12px;border:1px solid #fed7aa;border-radius:12px;background:#fff7ed;color:#9a3412;font-weight:700;line-height:1.5;">' + (msg || 'Instagram connected, but live stats need the backend token exchange to finish.') + '</div>';
-  }
+    var scBtn = qs('#ai .providers .prov[data-p="soundcloud"]');
+    if (scBtn) scBtn.classList.add('active');
 
-  function mbSafeLoadJSONForAnalyze(key, fallback){
-    try {
-      var raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : fallback;
-    } catch(e) {
-      return fallback;
-    }
-  }
-
-  function mbSoundCloudHasSavedData(){
-    var token = load('mb_soundcloud_access_token','');
-    var apiStats = mbSafeLoadJSONForAnalyze('mb_soundcloud_api_stats', null);
-    var profile = mbSafeLoadJSONForAnalyze('mb_soundcloud_profile', null);
-    var tracks = mbSafeLoadJSONForAnalyze('mb_soundcloud_tracks', null);
-    var store = mbSafeLoadJSONForAnalyze('mb_manual_stats', {});
-    var scRows = store && store.byPlatform && store.byPlatform.soundcloud;
-    return !!(token || apiStats || profile || (Array.isArray(tracks) && tracks.length) || (Array.isArray(scRows) && scRows.length));
-  }
-
-  async function mbAnalyzeSoundCloudFromSavedOrApi(options){
-    options = options || {};
-    var token = load('mb_soundcloud_access_token','');
-    var profile = mbSafeLoadJSONForAnalyze('mb_soundcloud_profile', {}) || {};
-    var tracks = mbSafeLoadJSONForAnalyze('mb_soundcloud_tracks', []) || [];
-    var stats = mbSafeLoadJSONForAnalyze('mb_soundcloud_api_stats', null);
-    var sourceNote = 'saved SoundCloud API stats';
-
-    // If we have a fresh SoundCloud token, pull the newest profile/tracks before rendering.
-    // This keeps Analyze my socials from showing stale or blank numbers after OAuth returns.
-    if (token) {
-      try {
-        var meResp = await fetch(SC_BACKEND + '/api/soundcloud/me', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ access_token: token })
-        });
-        var meData = await meResp.json().catch(function(){ return {}; });
-        if (meResp.ok && meData && typeof meData === 'object') {
-          profile = meData;
-          localStorage.setItem('mb_soundcloud_profile', JSON.stringify(profile));
-          sourceNote = 'live SoundCloud API profile';
-        } else {
-          console.warn('SoundCloud /me during Analyze returned:', meData);
-        }
-      } catch(e) {
-        console.warn('SoundCloud /me during Analyze failed:', e);
-      }
-
-      try {
-        var tracksResp = await fetch(SC_BACKEND + '/api/soundcloud/tracks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ access_token: token, limit: 50 })
-        });
-        var tracksData = await tracksResp.json().catch(function(){ return []; });
-        if (tracksResp.ok) {
-          tracks = tracksData;
-          localStorage.setItem('mb_soundcloud_tracks', JSON.stringify(tracks || []));
-          sourceNote = 'live SoundCloud API profile + tracks';
-        } else {
-          console.warn('SoundCloud /tracks during Analyze returned:', tracksData);
-        }
-      } catch(e) {
-        console.warn('SoundCloud /tracks during Analyze failed:', e);
-      }
-    }
-
-    // Build + save stats so the existing Weekly Stats / Manual Advice renderer can see SoundCloud.
-    try {
-      if (typeof mbSaveSoundCloudApiStats === 'function') {
-        stats = mbSaveSoundCloudApiStats(profile || {}, tracks || []);
-      } else if (typeof mbBuildSoundCloudWeeklyStats === 'function') {
-        stats = mbBuildSoundCloudWeeklyStats(profile || {}, tracks || []);
-        if (typeof saveWeeklyStats === 'function') saveWeeklyStats('soundcloud', stats);
-        localStorage.setItem('mb_soundcloud_api_stats', JSON.stringify(Object.assign({}, stats, { date: new Date().toISOString() })));
-      }
-    } catch(e) {
-      console.warn('SoundCloud Analyze could not rebuild weekly stats:', e);
-    }
-
-    stats = stats || mbSafeLoadJSONForAnalyze('mb_soundcloud_api_stats', null) || {};
-
-    try {
-      var p = normalizeProfile(loadProfile());
-      p.streaming.soundcloud = true;
-      if (profile && profile.permalink_url) p.streamUrls.soundcloud = profile.permalink_url;
-      saveProfile(p);
-      document.dispatchEvent(new CustomEvent('mb:profile-updated', { detail: p }));
-    } catch(e) {}
-
-    var results = qs('#aiResults');
-    var signals = qs('#signalsList');
-    var moves = qs('#movesList');
-    var plan = qs('#planBox');
-    var advice = qs('#manualAdviceBox');
-    var pro = qs('#proInsightsBox');
-    var fmtNum = function(n){ return Number(n || 0).toLocaleString(); };
-    var trackCount = Array.isArray(tracks) ? tracks.length : (Array.isArray(tracks && tracks.collection) ? tracks.collection.length : 0);
-    var profileName = profile && (profile.username || profile.full_name || profile.permalink || profile.first_name) || 'Connected SoundCloud account';
-
-    if (results) results.classList.remove('hidden');
-    if (signals) {
-      signals.innerHTML = [
-        '<li><strong>SoundCloud connected:</strong> ' + mbLocalEscape(profileName) + '</li>',
-        '<li><strong>Followers:</strong> ' + fmtNum(stats.followers) + '</li>',
-        '<li><strong>Tracks checked:</strong> ' + fmtNum(trackCount || stats.posts) + '</li>',
-        '<li><strong>Total plays:</strong> ' + fmtNum(stats.views) + '</li>',
-        '<li><strong>Likes:</strong> ' + fmtNum(stats.likes) + ' • <strong>Comments:</strong> ' + fmtNum(stats.comments) + ' • <strong>Reposts:</strong> ' + fmtNum(stats.shares) + '</li>',
-        '<li><strong>Source:</strong> ' + mbLocalEscape(sourceNote) + '</li>'
-      ].join('');
-    }
-    if (moves) {
-      moves.innerHTML = [
-        '<li>Pin or spotlight the track with the strongest plays/likes and push that link on Instagram, TikTok, and X.</li>',
-        '<li>Use the top SoundCloud track as the main content engine: short performance clip, studio clip, lyric caption, and story repost.</li>',
-        '<li>If plays are higher than likes/comments, add a stronger call-to-action asking listeners to comment, repost, or save.</li>'
-      ].join('');
-    }
-    if (plan) {
-      plan.textContent = 'Day 1: Share your best SoundCloud track with a short hook video.\nDay 2: Post a behind-the-scenes clip and link the SoundCloud track.\nDay 3: Ask listeners which track/verse is strongest.\nDay 4: Repost the track with a different caption and visual.\nDay 5: DM or tag 3 related creators for repost/collab traffic.\nDay 6: Turn comments into a follow-up post.\nDay 7: Check SoundCloud plays, likes, comments, and reposts again.';
-    }
-
-    if (typeof window.mbRenderManualAdvice === 'function') window.mbRenderManualAdvice();
-    if (advice && !advice.innerHTML.trim()) {
-      advice.innerHTML = '<div style="padding:12px;border:1px solid #dbeafe;border-radius:12px;background:#f8fbff;color:#334155;font-weight:700;line-height:1.5;">SoundCloud API stats are connected and saved. Plays: ' + fmtNum(stats.views) + ' • Followers: ' + fmtNum(stats.followers) + ' • Likes: ' + fmtNum(stats.likes) + '.</div>';
-    }
-    if (pro) {
-      pro.innerHTML = '<div style="margin:4px 0">• Top music creators keep one main track link easy to find, then cut that track into multiple short-form posts.</div><div style="margin:4px 0">• They push comments and reposts, not only plays, because engagement helps prove which song is worth promoting harder.</div>';
-    }
-
-    mbShowSoundCloudStatus('SoundCloud analyzed: ' + fmtNum(stats.followers) + ' followers • ' + fmtNum(stats.views) + ' plays • ' + fmtNum(stats.likes) + ' likes.', true);
+    await analyzeSoundCloud();
     return true;
   }
 
-  async function analyzeNow(){
+  window.mbFinishSoundCloudOauth = finishSoundCloudOauth;
+
+  async function analyzeSoundCloud(){
     var agree = qs('#agree');
     if (agree && !agree.checked) {
       alert('Check the read-only analytics agreement box first, then press Analyze my socials.');
-      unlockAnalyze('needs-agreement');
-      return;
+      unlockAnalyze();
+      return false;
     }
 
-    var scBtn = qs('#ai .providers .prov[data-p="soundcloud"]');
-    var scActive = !!(scBtn && scBtn.classList.contains('active'));
-    var scReady = mbSoundCloudHasSavedData();
+    var token = load('mb_soundcloud_access_token','');
+    if (!token) {
+      showStatus('SoundCloud is not connected yet. Click SoundCloud first, approve it, then press Analyze my socials.', false);
+      return false;
+    }
 
     showScan(true);
     try {
-      // If SoundCloud is selected or connected, show SoundCloud stats first.
-      // This prevents an old saved Instagram login from hijacking the Analyze result.
-      if (scActive || scReady) {
-        await mbAnalyzeSoundCloudFromSavedOrApi();
-        return;
-      }
+      var profile = await postJson('/api/soundcloud/me', { access_token: token });
+      var tracks = await postJson('/api/soundcloud/tracks', { access_token: token, limit: 50 });
 
-      var token = load('mb_instagram_access_token','');
-      if (!token) {
-        try { await retryCodeExchangeIfNeeded(); } catch(exchangeErr) { console.warn('Retry exchange failed:', exchangeErr); }
-        token = load('mb_instagram_access_token','');
-      }
+      var stats = buildSoundCloudStats(profile || {}, tracks || []);
+      save('mb_soundcloud_profile', profile || {});
+      save('mb_soundcloud_tracks', tracks || []);
+      save('mb_soundcloud_api_stats', stats);
 
-      // Deep fix: SoundCloud is a real connected API flow now. Do not block it just because Instagram has no token.
-      if (!token && (scActive || scReady)) {
-        await mbAnalyzeSoundCloudFromSavedOrApi();
-        return;
-      }
+      // Also save into the site's weekly stats format when that helper exists.
+      try {
+        if (typeof window.saveWeeklyStats === 'function') window.saveWeeklyStats('soundcloud', stats);
+        else if (typeof saveWeeklyStats === 'function') saveWeeklyStats('soundcloud', stats);
+      } catch(e){ console.warn('Could not save weekly SoundCloud stats:', e); }
 
-      if (!token) {
-        renderFallbackMessage('No connected API stats were found yet. Connect SoundCloud or Instagram first, then press Analyze my socials again.');
-        return;
-      }
-
-      var igBtn = qs('#ai .providers .prov[data-p="instagram"]');
-      if (igBtn) igBtn.classList.add('active');
-
-      var profile = await postJson('/api/instagram/profile', { access_token: token });
-      var media = null;
-      try { media = await postJson('/api/instagram/media', { access_token: token }); } catch(e){ console.warn('Media failed', e); }
-      save('mb_instagram_profile', profile || {});
-      if (media) save('mb_instagram_media', media || {});
-      markInstagramConnected('analyzed');
-
-      if (typeof window.mbRenderInstagramProfile === 'function') {
-        window.mbRenderInstagramProfile(profile || {}, media || {}, {}, true);
-      } else {
-        renderFallbackMessage('Instagram profile loaded. Renderer function was not found, so check the console for the returned data.');
-        console.log('Instagram profile:', profile, 'media:', media);
-      }
-
-      // If SoundCloud is also connected, refresh/save it too so Weekly Stats includes it after Analyze.
-      if (scActive || scReady) {
-        await mbAnalyzeSoundCloudFromSavedOrApi({ append: true });
-      }
+      renderSoundCloudResults(profile || {}, tracks || [], stats);
+      showStatus('SoundCloud analyzed: ' + num(stats.followers) + ' followers • ' + num(stats.views) + ' plays • ' + num(stats.likes) + ' likes.', true);
+      return true;
     } catch(err) {
-      console.error('Analyze my socials failed:', err);
-      if (scActive || scReady) {
-        try { await mbAnalyzeSoundCloudFromSavedOrApi(); return; } catch(scErr) { console.error('SoundCloud fallback analyze failed:', scErr); }
-      }
-      renderFallbackMessage('Analyze error: ' + (window.mbStringifyAnalyzeError ? window.mbStringifyAnalyzeError(err) : (err && err.message ? err.message : 'Unknown error')));
+      console.error('SoundCloud-only analyze failed:', err);
+      showStatus('SoundCloud Analyze error: ' + (err && err.message ? err.message : String(err)), false);
+      return false;
     } finally {
       showScan(false);
-      unlockAnalyze('after-click');
+      unlockAnalyze();
     }
   }
 
-  function install(){
-    if (shouldUnlock()) unlockAnalyze('initial');
+  function renderSoundCloudResults(profile, tracks, stats){
+    var arr = getSoundCloudTracksArray(tracks);
+    var profileName = profile.username || profile.full_name || profile.permalink || 'Connected SoundCloud account';
 
+    var results = qs('#aiResults');
+    var signals = qs('#signalsList');
+    var moves = qs('#movesList');
+    var plan = qs('#planBox');
+    var pro = qs('#proInsightsBox');
+
+    if (results) results.classList.remove('hidden');
+
+    if (signals) {
+      signals.innerHTML = [
+        '<li><strong>SoundCloud connected:</strong> ' + esc(profileName) + '</li>',
+        '<li><strong>Followers:</strong> ' + num(stats.followers) + '</li>',
+        '<li><strong>Tracks checked:</strong> ' + num(stats.posts) + '</li>',
+        '<li><strong>Total plays:</strong> ' + num(stats.views) + '</li>',
+        '<li><strong>Likes:</strong> ' + num(stats.likes) + ' • <strong>Comments:</strong> ' + num(stats.comments) + ' • <strong>Reposts:</strong> ' + num(stats.shares) + '</li>'
+      ].join('');
+    }
+
+    if (moves) {
+      moves.innerHTML = [
+        '<li>Push the track with the most plays as your main SoundCloud link this week.</li>',
+        '<li>Cut your best track into short clips for TikTok, Reels, and Shorts.</li>',
+        '<li>If plays are higher than comments/reposts, add a stronger call-to-action asking listeners to comment or repost.</li>'
+      ].join('');
+    }
+
+    if (plan) {
+      plan.textContent =
+        'Day 1: Share your best SoundCloud track with a short hook video.
+' +
+        'Day 2: Post behind-the-scenes content and link the track.
+' +
+        'Day 3: Ask listeners which song or verse is strongest.
+' +
+        'Day 4: Repost the track with a new caption.
+' +
+        'Day 5: DM or tag 3 related creators for repost/collab traffic.
+' +
+        'Day 6: Turn comments into a follow-up post.
+' +
+        'Day 7: Check SoundCloud plays, likes, comments, and reposts again.';
+    }
+
+    if (pro) {
+      pro.innerHTML = '<div style="margin:4px 0">• Top music creators keep one main track link easy to find, then turn that track into several short-form posts.</div><div style="margin:4px 0">• They ask for comments/reposts, not just plays, because engagement proves the song is moving people.</div>';
+    }
+
+    console.log('SoundCloud profile:', profile);
+    console.log('SoundCloud tracks:', tracks);
+    console.log('SoundCloud stats:', stats);
+  }
+
+  function handleCallbackIfNeeded(){
     var params = new URLSearchParams(window.location.search || '');
-    var pendingProvider = '';
-    try { pendingProvider = localStorage.getItem('mb_pending_provider') || ''; } catch(e) {}
-    // SoundCloud also returns ?code=. Do not mark Instagram active on a SoundCloud OAuth callback.
-    if ((params.get('code') || params.get('error')) && pendingProvider !== 'soundcloud') markInstagramConnected('callback-url');
+    var code = params.get('code');
+    var state = params.get('state') || '';
+    var pending = load('mb_pending_provider','');
+    var scState = load('mb_soundcloud_oauth_state','');
+
+    // In this SoundCloud-only test file, every OAuth code is treated as SoundCloud.
+    if (!code) return;
+
+    if (state && scState && state !== scState) {
+      console.warn('SoundCloud state mismatch. Continuing only because this is a test file.', { returned: state, saved: scState });
+    }
+
+    finishSoundCloudOauth(code).then(function(){
+      try {
+        var clean = window.location.origin + window.location.pathname;
+        window.history.replaceState({}, document.title, clean);
+      } catch(e){}
+    }).catch(function(err){
+      console.error('SoundCloud callback failed:', err);
+      showStatus('SoundCloud callback error: ' + (err && err.message ? err.message : String(err)), false);
+    });
+  }
+
+  function install(){
+    disableInstagramForTest();
+    unlockAnalyze();
+
+    var scBtn = qs('#ai .providers .prov[data-p="soundcloud"]');
+    if (scBtn) {
+      scBtn.classList.add('active');
+      scBtn.addEventListener('click', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        startSoundCloudConnect().catch(function(err){
+          console.error('SoundCloud connect failed:', err);
+          showStatus('SoundCloud connect error: ' + (err && err.message ? err.message : String(err)), false);
+        });
+      }, true);
+    }
 
     var agree = qs('#agree');
-    if (agree) agree.addEventListener('change', function(){ if (shouldUnlock()) unlockAnalyze('agreement-change'); });
-
-    qsa('#ai .providers .prov').forEach(function(btn){
-      btn.addEventListener('click', function(){ setTimeout(function(){ if (shouldUnlock()) unlockAnalyze('provider-click'); }, 50); }, true);
-    });
-
-    document.addEventListener('mb:profile-updated', function(){ if (shouldUnlock()) unlockAnalyze('profile-updated'); });
+    if (agree) agree.addEventListener('change', unlockAnalyze);
 
     document.addEventListener('click', function(e){
       var btn = e.target && e.target.closest ? e.target.closest('#startAnalysis') : null;
       if (!btn) return;
-      // Take over the Analyze button so older broken handlers cannot block it.
       e.preventDefault();
       e.stopPropagation();
       if (e.stopImmediatePropagation) e.stopImmediatePropagation();
-      analyzeNow();
+      analyzeSoundCloud();
     }, true);
 
-    var start = qs('#startAnalysis');
-    if (start) {
-      try {
-        new MutationObserver(function(){ if (shouldUnlock()) unlockAnalyze('mutation'); }).observe(start, { attributes:true, attributeFilter:['disabled','style','class'] });
-      } catch(e){}
-    }
-
-    var n = 0;
-    var timer = setInterval(function(){
-      if (shouldUnlock()) unlockAnalyze('timer');
-      n++;
-      if (n > 30) clearInterval(timer);
-    }, 300);
+    handleCallbackIfNeeded();
+    setTimeout(unlockAnalyze, 200);
+    setTimeout(unlockAnalyze, 1000);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once:true });
   else install();
 })();
 </script>
-
-
-<script id="mb-readable-analyze-errors-hotfix">
-;(function(){
-  function stringifyError(err){
-    try {
-      if (!err) return 'Unknown error';
-      if (typeof err === 'string') return err;
-      if (err.message && err.message !== '[object Object]') return String(err.message);
-      if (err.error_description) return String(err.error_description);
-      if (err.error_message) return typeof err.error_message === 'string' ? err.error_message : JSON.stringify(err.error_message);
-      if (err.error) return typeof err.error === 'string' ? err.error : JSON.stringify(err.error);
-      if (err.message === '[object Object]' && err.cause) return stringifyError(err.cause);
-      return JSON.stringify(err);
-    } catch(e) {
-      return String(err && err.message ? err.message : err);
-    }
-  }
-  window.mbStringifyAnalyzeError = stringifyError;
-
-  var oldFetch = window.fetch;
-  window.fetch = async function(){
-    var res = await oldFetch.apply(this, arguments);
-    try {
-      var url = String(arguments[0] || '');
-      if (url.indexOf('/api/soundcloud/') !== -1 && !res.ok) {
-        var clone = res.clone();
-        var data = await clone.json().catch(function(){ return null; });
-        console.error('SoundCloud backend returned HTTP ' + res.status + ':', data || res.statusText);
-        var status = document.getElementById('mbSoundCloudStatus');
-        if (status && data) {
-          status.textContent = 'SoundCloud API error: ' + stringifyError(data);
-          status.style.color = '#b91c1c';
-        }
-      }
-    } catch(e) {}
-    return res;
-  };
-})();
-</script>
-
 </body>
 </html>
