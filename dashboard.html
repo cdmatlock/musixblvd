@@ -4361,7 +4361,7 @@ const MB_API_ENDPOINTS = {
 
     if (!platformKeys.length) {
       if (box) box.innerHTML = `<div class="muted">No manual weekly stats saved yet. Connect a platform and enter stats.</div>`;
-      if (libraryAdvice) libraryAdvice.innerHTML = `<li class="muted">No streaming stats saved yet. Pick Spotify, SoundCloud, or Apple Music and connect your account.</li>`;
+      if (libraryAdvice) libraryAdvice.innerHTML = `<li class="muted">No streaming stats saved yet. Pick Spotify or Apple Music and press Connect Accounts.</li>`;
       return;
     }
 
@@ -4400,12 +4400,11 @@ const MB_API_ENDPOINTS = {
           </div>
 
           <div class="tiny muted" style="margin:8px 0 10px">
-            ${platform === 'soundcloud' ? 'Followers' : 'Followers'}: ${Number(latest.followers || 0).toLocaleString()}
-            • ${platform === 'soundcloud' ? 'Uploads' : 'Posts'}: ${Number(latest.posts || 0)}
-            • ${platform === 'soundcloud' ? 'Likes' : 'Avg likes'}: ${Number(latest.likes || 0).toLocaleString()}
-            • ${platform === 'soundcloud' ? 'Comments' : 'Avg comments'}: ${Number(latest.comments || 0).toLocaleString()}
-            • ${platform === 'soundcloud' ? 'Reposts' : 'Avg shares'}: ${Number(latest.shares || 0).toLocaleString()}
-            ${platform === 'soundcloud' ? `• Plays: ${Number(latest.views || 0).toLocaleString()}` : ''}
+            Followers: ${Number(latest.followers || 0).toLocaleString()}
+            • Posts: ${Number(latest.posts || 0)}
+            • Avg likes: ${Number(latest.likes || 0).toLocaleString()}
+            • Avg comments: ${Number(latest.comments || 0).toLocaleString()}
+            • Avg shares: ${Number(latest.shares || 0).toLocaleString()}
             • Engagement: ${engagement.toFixed(2)}%
             • Score: ${score.toFixed(1)}/10
             ${growthPct !== null ? ` • Follower growth: ${growthPct >= 0 ? '+' : ''}${growthPct.toFixed(1)}%` : ''}
@@ -4428,7 +4427,7 @@ const MB_API_ENDPOINTS = {
     if (libraryAdvice) {
       libraryAdvice.innerHTML = libraryLines.length
         ? libraryLines.join('')
-        : `<li class="muted">No streaming stats saved yet. Pick Spotify, SoundCloud, or Apple Music and connect your account.</li>`;
+        : `<li class="muted">No streaming stats saved yet. Pick Spotify or Apple Music and press Connect Accounts.</li>`;
     }
   }
 
@@ -4704,54 +4703,6 @@ const MB_API_ENDPOINTS = {
     window.location.href = data.auth_url;
   }
 
-  function mbNormalizeSoundCloudTracks(raw) {
-    if (Array.isArray(raw)) return raw;
-    if (Array.isArray(raw?.collection)) return raw.collection;
-    if (Array.isArray(raw?.tracks)) return raw.tracks;
-    if (Array.isArray(raw?.data)) return raw.data;
-    return [];
-  }
-
-  function mbNum(value) {
-    const n = Number(value || 0);
-    return Number.isFinite(n) ? n : 0;
-  }
-
-  function mbBuildSoundCloudWeeklyStats(profileData, tracksRaw) {
-    const tracks = mbNormalizeSoundCloudTracks(tracksRaw);
-    const now = Date.now();
-    const weekMs = 7 * 24 * 60 * 60 * 1000;
-    const recentTracks = tracks.filter((track) => {
-      const created = Date.parse(track?.created_at || track?.createdAt || track?.release_date || '');
-      return Number.isFinite(created) && (now - created) <= weekMs;
-    });
-
-    const sum = (keys) => tracks.reduce((total, track) => {
-      for (const key of keys) {
-        if (track && track[key] !== undefined && track[key] !== null) return total + mbNum(track[key]);
-      }
-      return total;
-    }, 0);
-
-    return {
-      followers: mbNum(profileData?.followers_count ?? profileData?.followers),
-      posts: recentTracks.length || mbNum(profileData?.track_count) || tracks.length,
-      likes: sum(['favoritings_count', 'likes_count', 'like_count', 'likes']),
-      comments: sum(['comment_count', 'comments_count', 'comments']),
-      shares: sum(['reposts_count', 'repost_count', 'reposts']),
-      views: sum(['playback_count', 'plays_count', 'play_count', 'plays']),
-      niche: profileData?.genre || profileData?.description || 'SoundCloud',
-      source: 'soundcloud_api'
-    };
-  }
-
-  function mbSaveSoundCloudApiStats(profileData, tracksData) {
-    const stats = mbBuildSoundCloudWeeklyStats(profileData || {}, tracksData || []);
-    saveWeeklyStats('soundcloud', stats);
-    try { localStorage.setItem('mb_soundcloud_api_stats', JSON.stringify({ ...stats, date: new Date().toISOString() })); } catch (e) {}
-    return stats;
-  }
-
   async function mbFinishSoundCloudOauth(code) {
     const codeVerifier = localStorage.getItem('mb_soundcloud_code_verifier') || '';
 
@@ -4791,7 +4742,6 @@ const MB_API_ENDPOINTS = {
         body: JSON.stringify({ access_token: tokenData.access_token })
       });
       profileData = await meResp.json().catch(() => ({}));
-      if (!meResp.ok) console.warn('SoundCloud /me returned an error:', profileData);
       localStorage.setItem('mb_soundcloud_profile', JSON.stringify(profileData || {}));
     } catch (e) {
       console.warn('SoundCloud profile fetch failed:', e);
@@ -4801,20 +4751,12 @@ const MB_API_ENDPOINTS = {
       const tracksResp = await fetch(MB_SOUNDCLOUD_BACKEND + '/api/soundcloud/tracks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ access_token: tokenData.access_token, limit: 50 })
+        body: JSON.stringify({ access_token: tokenData.access_token, limit: 10 })
       });
       tracksData = await tracksResp.json().catch(() => []);
-      if (!tracksResp.ok) console.warn('SoundCloud /tracks returned an error:', tracksData);
       localStorage.setItem('mb_soundcloud_tracks', JSON.stringify(tracksData || []));
     } catch (e) {
       console.warn('SoundCloud tracks fetch failed:', e);
-    }
-
-    let apiStats = null;
-    try {
-      apiStats = mbSaveSoundCloudApiStats(profileData, tracksData);
-    } catch (e) {
-      console.warn('Could not save SoundCloud API stats:', e);
     }
 
     try {
@@ -4830,18 +4772,7 @@ const MB_API_ENDPOINTS = {
     const soundBtn = document.querySelector('#ai .providers .prov[data-p="soundcloud"]');
     if (soundBtn) soundBtn.classList.add('active');
 
-    window.mbRenderManualAdvice?.();
-    window.mbRenderProfileViews?.();
-    window.mbSyncAnalyzeButton?.();
-
-    if (apiStats) {
-      mbShowSoundCloudStatus(
-        `SoundCloud connected. API stats loaded: ${mbNum(apiStats.followers).toLocaleString()} followers • ${mbNum(apiStats.views).toLocaleString()} plays • ${mbNum(apiStats.likes).toLocaleString()} likes.`,
-        true
-      );
-    } else {
-      mbShowSoundCloudStatus('SoundCloud connected, but API stats could not be saved. Check Render logs for /api/soundcloud/me and /api/soundcloud/tracks.', false);
-    }
+    mbShowSoundCloudStatus('SoundCloud connected. Now check the agreement box and click Analyze my socials when you are ready.', true);
 
     try {
       localStorage.removeItem('mb_pending_provider');
@@ -9573,21 +9504,6 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
       var start = e.target && e.target.closest ? e.target.closest('#startAnalysis') : null;
       if (!start) return;
 
-      // Do NOT let the Instagram failsafe steal the Analyze click when SoundCloud is selected/connected.
-      var scActive = !!qs('#ai .providers .prov[data-p="soundcloud"].active');
-      var scPending = false;
-      var scReady = false;
-      try { scPending = localStorage.getItem('mb_pending_provider') === 'soundcloud'; } catch(e) {}
-      try {
-        scReady = !!(
-          localStorage.getItem('mb_soundcloud_access_token') ||
-          localStorage.getItem('mb_soundcloud_api_stats') ||
-          localStorage.getItem('mb_soundcloud_profile') ||
-          localStorage.getItem('mb_soundcloud_tracks')
-        );
-      } catch(e) {}
-      if (scActive || scPending || scReady) return;
-
       var igActive = !!qs('#ai .providers .prov[data-p="instagram"].active') || hasInstagramData();
       if (!igActive) return; // Leave every non-Instagram social exactly alone.
 
@@ -9608,7 +9524,6 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
 <script id="mb-analyze-socials-strong-failsafe-v2">
 ;(function(){
   var BACKEND = 'https://musixblvd.onrender.com';
-  var SC_BACKEND = BACKEND;
   var REDIRECT_URI = 'https://musixblvd.com/dashboard.html';
 
   function qs(s){ return document.querySelector(s); }
@@ -9616,7 +9531,6 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
   function parseJson(x, fallback){ try { return JSON.parse(x); } catch(e){ return fallback; } }
   function save(k,v){ try { localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v)); } catch(e){} }
   function load(k, fallback){ try { var v=localStorage.getItem(k); return v == null ? fallback : v; } catch(e){ return fallback; } }
-  function mbLocalEscape(value){ return String(value == null ? '' : value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&#39;'); }
 
   function hasInstagramConnection(){
     var token = load('mb_instagram_access_token','');
@@ -9711,140 +9625,6 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     if (advice) advice.innerHTML = '<div style="padding:12px;border:1px solid #fed7aa;border-radius:12px;background:#fff7ed;color:#9a3412;font-weight:700;line-height:1.5;">' + (msg || 'Instagram connected, but live stats need the backend token exchange to finish.') + '</div>';
   }
 
-  function mbSafeLoadJSONForAnalyze(key, fallback){
-    try {
-      var raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : fallback;
-    } catch(e) {
-      return fallback;
-    }
-  }
-
-  function mbSoundCloudHasSavedData(){
-    var token = load('mb_soundcloud_access_token','');
-    var apiStats = mbSafeLoadJSONForAnalyze('mb_soundcloud_api_stats', null);
-    var profile = mbSafeLoadJSONForAnalyze('mb_soundcloud_profile', null);
-    var tracks = mbSafeLoadJSONForAnalyze('mb_soundcloud_tracks', null);
-    var store = mbSafeLoadJSONForAnalyze('mb_manual_stats', {});
-    var scRows = store && store.byPlatform && store.byPlatform.soundcloud;
-    return !!(token || apiStats || profile || (Array.isArray(tracks) && tracks.length) || (Array.isArray(scRows) && scRows.length));
-  }
-
-  async function mbAnalyzeSoundCloudFromSavedOrApi(options){
-    options = options || {};
-    var token = load('mb_soundcloud_access_token','');
-    var profile = mbSafeLoadJSONForAnalyze('mb_soundcloud_profile', {}) || {};
-    var tracks = mbSafeLoadJSONForAnalyze('mb_soundcloud_tracks', []) || [];
-    var stats = mbSafeLoadJSONForAnalyze('mb_soundcloud_api_stats', null);
-    var sourceNote = 'saved SoundCloud API stats';
-
-    // If we have a fresh SoundCloud token, pull the newest profile/tracks before rendering.
-    // This keeps Analyze my socials from showing stale or blank numbers after OAuth returns.
-    if (token) {
-      try {
-        var meResp = await fetch(SC_BACKEND + '/api/soundcloud/me', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ access_token: token })
-        });
-        var meData = await meResp.json().catch(function(){ return {}; });
-        if (meResp.ok && meData && typeof meData === 'object') {
-          profile = meData;
-          localStorage.setItem('mb_soundcloud_profile', JSON.stringify(profile));
-          sourceNote = 'live SoundCloud API profile';
-        } else {
-          console.warn('SoundCloud /me during Analyze returned:', meData);
-        }
-      } catch(e) {
-        console.warn('SoundCloud /me during Analyze failed:', e);
-      }
-
-      try {
-        var tracksResp = await fetch(SC_BACKEND + '/api/soundcloud/tracks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ access_token: token, limit: 50 })
-        });
-        var tracksData = await tracksResp.json().catch(function(){ return []; });
-        if (tracksResp.ok) {
-          tracks = tracksData;
-          localStorage.setItem('mb_soundcloud_tracks', JSON.stringify(tracks || []));
-          sourceNote = 'live SoundCloud API profile + tracks';
-        } else {
-          console.warn('SoundCloud /tracks during Analyze returned:', tracksData);
-        }
-      } catch(e) {
-        console.warn('SoundCloud /tracks during Analyze failed:', e);
-      }
-    }
-
-    // Build + save stats so the existing Weekly Stats / Manual Advice renderer can see SoundCloud.
-    try {
-      if (typeof mbSaveSoundCloudApiStats === 'function') {
-        stats = mbSaveSoundCloudApiStats(profile || {}, tracks || []);
-      } else if (typeof mbBuildSoundCloudWeeklyStats === 'function') {
-        stats = mbBuildSoundCloudWeeklyStats(profile || {}, tracks || []);
-        if (typeof saveWeeklyStats === 'function') saveWeeklyStats('soundcloud', stats);
-        localStorage.setItem('mb_soundcloud_api_stats', JSON.stringify(Object.assign({}, stats, { date: new Date().toISOString() })));
-      }
-    } catch(e) {
-      console.warn('SoundCloud Analyze could not rebuild weekly stats:', e);
-    }
-
-    stats = stats || mbSafeLoadJSONForAnalyze('mb_soundcloud_api_stats', null) || {};
-
-    try {
-      var p = normalizeProfile(loadProfile());
-      p.streaming.soundcloud = true;
-      if (profile && profile.permalink_url) p.streamUrls.soundcloud = profile.permalink_url;
-      saveProfile(p);
-      document.dispatchEvent(new CustomEvent('mb:profile-updated', { detail: p }));
-    } catch(e) {}
-
-    var results = qs('#aiResults');
-    var signals = qs('#signalsList');
-    var moves = qs('#movesList');
-    var plan = qs('#planBox');
-    var advice = qs('#manualAdviceBox');
-    var pro = qs('#proInsightsBox');
-    var fmtNum = function(n){ return Number(n || 0).toLocaleString(); };
-    var trackCount = Array.isArray(tracks) ? tracks.length : (Array.isArray(tracks && tracks.collection) ? tracks.collection.length : 0);
-    var profileName = profile && (profile.username || profile.full_name || profile.permalink || profile.first_name) || 'Connected SoundCloud account';
-
-    if (results) results.classList.remove('hidden');
-    if (signals) {
-      signals.innerHTML = [
-        '<li><strong>SoundCloud connected:</strong> ' + mbLocalEscape(profileName) + '</li>',
-        '<li><strong>Followers:</strong> ' + fmtNum(stats.followers) + '</li>',
-        '<li><strong>Tracks checked:</strong> ' + fmtNum(trackCount || stats.posts) + '</li>',
-        '<li><strong>Total plays:</strong> ' + fmtNum(stats.views) + '</li>',
-        '<li><strong>Likes:</strong> ' + fmtNum(stats.likes) + ' • <strong>Comments:</strong> ' + fmtNum(stats.comments) + ' • <strong>Reposts:</strong> ' + fmtNum(stats.shares) + '</li>',
-        '<li><strong>Source:</strong> ' + mbLocalEscape(sourceNote) + '</li>'
-      ].join('');
-    }
-    if (moves) {
-      moves.innerHTML = [
-        '<li>Pin or spotlight the track with the strongest plays/likes and push that link on Instagram, TikTok, and X.</li>',
-        '<li>Use the top SoundCloud track as the main content engine: short performance clip, studio clip, lyric caption, and story repost.</li>',
-        '<li>If plays are higher than likes/comments, add a stronger call-to-action asking listeners to comment, repost, or save.</li>'
-      ].join('');
-    }
-    if (plan) {
-      plan.textContent = 'Day 1: Share your best SoundCloud track with a short hook video.\nDay 2: Post a behind-the-scenes clip and link the SoundCloud track.\nDay 3: Ask listeners which track/verse is strongest.\nDay 4: Repost the track with a different caption and visual.\nDay 5: DM or tag 3 related creators for repost/collab traffic.\nDay 6: Turn comments into a follow-up post.\nDay 7: Check SoundCloud plays, likes, comments, and reposts again.';
-    }
-
-    if (typeof window.mbRenderManualAdvice === 'function') window.mbRenderManualAdvice();
-    if (advice && !advice.innerHTML.trim()) {
-      advice.innerHTML = '<div style="padding:12px;border:1px solid #dbeafe;border-radius:12px;background:#f8fbff;color:#334155;font-weight:700;line-height:1.5;">SoundCloud API stats are connected and saved. Plays: ' + fmtNum(stats.views) + ' • Followers: ' + fmtNum(stats.followers) + ' • Likes: ' + fmtNum(stats.likes) + '.</div>';
-    }
-    if (pro) {
-      pro.innerHTML = '<div style="margin:4px 0">• Top music creators keep one main track link easy to find, then cut that track into multiple short-form posts.</div><div style="margin:4px 0">• They push comments and reposts, not only plays, because engagement helps prove which song is worth promoting harder.</div>';
-    }
-
-    mbShowSoundCloudStatus('SoundCloud analyzed: ' + fmtNum(stats.followers) + ' followers • ' + fmtNum(stats.views) + ' plays • ' + fmtNum(stats.likes) + ' likes.', true);
-    return true;
-  }
-
   async function analyzeNow(){
     var agree = qs('#agree');
     if (agree && !agree.checked) {
@@ -9853,38 +9633,21 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
       return;
     }
 
-    var scBtn = qs('#ai .providers .prov[data-p="soundcloud"]');
-    var scActive = !!(scBtn && scBtn.classList.contains('active'));
-    var scReady = mbSoundCloudHasSavedData();
+    var igBtn = qs('#ai .providers .prov[data-p="instagram"]');
+    if (igBtn) igBtn.classList.add('active');
 
     showScan(true);
     try {
-      // If SoundCloud is selected or connected, show SoundCloud stats first.
-      // This prevents an old saved Instagram login from hijacking the Analyze result.
-      if (scActive || scReady) {
-        await mbAnalyzeSoundCloudFromSavedOrApi();
-        return;
-      }
-
       var token = load('mb_instagram_access_token','');
       if (!token) {
         try { await retryCodeExchangeIfNeeded(); } catch(exchangeErr) { console.warn('Retry exchange failed:', exchangeErr); }
         token = load('mb_instagram_access_token','');
       }
 
-      // Deep fix: SoundCloud is a real connected API flow now. Do not block it just because Instagram has no token.
-      if (!token && (scActive || scReady)) {
-        await mbAnalyzeSoundCloudFromSavedOrApi();
-        return;
-      }
-
       if (!token) {
-        renderFallbackMessage('No connected API stats were found yet. Connect SoundCloud or Instagram first, then press Analyze my socials again.');
+        renderFallbackMessage('The Analyze button works now, but Instagram still did not return an access token. The backend /api/instagram/exchange-code route still needs the exact redirect_uri: ' + REDIRECT_URI);
         return;
       }
-
-      var igBtn = qs('#ai .providers .prov[data-p="instagram"]');
-      if (igBtn) igBtn.classList.add('active');
 
       var profile = await postJson('/api/instagram/profile', { access_token: token });
       var media = null;
@@ -9899,17 +9662,9 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
         renderFallbackMessage('Instagram profile loaded. Renderer function was not found, so check the console for the returned data.');
         console.log('Instagram profile:', profile, 'media:', media);
       }
-
-      // If SoundCloud is also connected, refresh/save it too so Weekly Stats includes it after Analyze.
-      if (scActive || scReady) {
-        await mbAnalyzeSoundCloudFromSavedOrApi({ append: true });
-      }
     } catch(err) {
       console.error('Analyze my socials failed:', err);
-      if (scActive || scReady) {
-        try { await mbAnalyzeSoundCloudFromSavedOrApi(); return; } catch(scErr) { console.error('SoundCloud fallback analyze failed:', scErr); }
-      }
-      renderFallbackMessage('Analyze error: ' + (err && err.message ? err.message : 'Unknown error'));
+      renderFallbackMessage('Instagram analyze error: ' + (err && err.message ? err.message : 'Unknown error'));
     } finally {
       showScan(false);
       unlockAnalyze('after-click');
@@ -9920,10 +9675,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     if (shouldUnlock()) unlockAnalyze('initial');
 
     var params = new URLSearchParams(window.location.search || '');
-    var pendingProvider = '';
-    try { pendingProvider = localStorage.getItem('mb_pending_provider') || ''; } catch(e) {}
-    // SoundCloud also returns ?code=. Do not mark Instagram active on a SoundCloud OAuth callback.
-    if ((params.get('code') || params.get('error')) && pendingProvider !== 'soundcloud') markInstagramConnected('callback-url');
+    if (params.get('code') || params.get('error')) markInstagramConnected('callback-url');
 
     var agree = qs('#agree');
     if (agree) agree.addEventListener('change', function(){ if (shouldUnlock()) unlockAnalyze('agreement-change'); });
