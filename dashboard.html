@@ -9328,7 +9328,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
       saveJson('mb_profile', p);
       document.dispatchEvent(new CustomEvent('mb:profile-updated', { detail:p }));
     } catch(e){}
-    setStatus('mbInstagramStatus', 'Instagram connected: <strong>' + esc(bundle.profile.username || 'account') + '</strong>.', true);
+    setStatus('mbInstagramStatus', 'Instagram connected: <strong>@' + esc(bundle.profile.username || 'account') + '</strong>.', true);
     try { localStorage.removeItem('mb_pending_provider'); } catch(e){}
   }
 
@@ -9340,49 +9340,166 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     return !!(load('mb_soundcloud_access_token','') || loadJson('mb_soundcloud_api_stats', null) || loadJson('mb_soundcloud_profile', null));
   }
 
-  function renderInstagramResults(bundle){
+  function normalizeTracks(raw){
+    if (Array.isArray(raw)) return raw;
+    if (Array.isArray(raw && raw.collection)) return raw.collection;
+    if (Array.isArray(raw && raw.data)) return raw.data;
+    return [];
+  }
+  function numberFrom(obj, keys){
+    for (var i=0;i<keys.length;i++) {
+      var v = obj && obj[keys[i]];
+      if (typeof v === 'number' && isFinite(v)) return v;
+      if (typeof v === 'string' && v.trim() && !isNaN(Number(v))) return Number(v);
+    }
+    return 0;
+  }
+  function fmt(n){
+    if (n == null || n === '—') return '—';
+    var x = Number(n);
+    return isFinite(x) ? x.toLocaleString() : esc(n);
+  }
+
+  function ensurePlatformResultsGrid(){
+    var results = qs('#aiResults');
+    if (results) results.classList.remove('hidden');
+    var grid = qs('#platformResultsGrid');
+    if (grid) return grid;
+
+    grid = document.createElement('div');
+    grid.id = 'platformResultsGrid';
+    grid.className = 'panel-card';
+    grid.style.marginTop = '12px';
+    grid.innerHTML = '<h3>Platform Stats</h3><div id="platformCardsGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:10px"></div>';
+
+    var topSignalsCard = qs('#aiResults .panel-card');
+    if (topSignalsCard && topSignalsCard.parentElement) topSignalsCard.insertAdjacentElement('afterend', grid);
+    else if (results) results.appendChild(grid);
+    return grid;
+  }
+
+  function upsertPlatformCard(id, html){
+    ensurePlatformResultsGrid();
+    var cards = qs('#platformCardsGrid');
+    if (!cards) return;
+    var card = qs('#' + id);
+    if (!card) {
+      card = document.createElement('div');
+      card.id = id;
+      card.style.border = '1px solid #e2e8f0';
+      card.style.borderRadius = '16px';
+      card.style.background = '#fff';
+      card.style.padding = '14px';
+      card.style.boxShadow = '0 8px 22px rgba(15,23,42,.06)';
+      cards.appendChild(card);
+    }
+    card.innerHTML = html;
+  }
+
+  function renderInstagramCard(bundle){
     bundle = bundle || {};
     var profile = bundle.profile || loadJson('mb_instagram_profile', {}) || {};
     var media = bundle.media || loadJson('mb_instagram_media', {}) || {};
     var insights = bundle.insights || loadJson('mb_instagram_insights', {}) || {};
+    var username = profile.username || 'Instagram account';
+    var mediaList = Array.isArray(media.data) ? media.data : [];
+    var insightList = Array.isArray(insights.data) ? insights.data : [];
+    var insightBits = insightList.slice(0,3).map(function(x){
+      var val = x && x.total_value && typeof x.total_value.value !== 'undefined' ? x.total_value.value : (x && x.values && x.values[0] && x.values[0].value);
+      return '<span class="weekly-stat-pill">' + esc(x.name || x.metric || 'Insight') + ': <strong>' + fmt(val == null ? '—' : val) + '</strong></span>';
+    }).join('');
+    upsertPlatformCard('platformCardInstagram',
+      '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">' +
+        '<div><div style="font-weight:900;font-size:17px">Instagram</div><div class="tiny muted">@' + esc(username) + '</div></div>' +
+        '<span class="tag">API</span>' +
+      '</div>' +
+      '<div class="weekly-platform-stats" style="margin-top:12px">' +
+        '<span class="weekly-stat-pill">Followers: <strong>' + fmt(profile.followers_count == null ? '—' : profile.followers_count) + '</strong></span>' +
+        '<span class="weekly-stat-pill">Media: <strong>' + fmt(profile.media_count == null ? mediaList.length : profile.media_count) + '</strong></span>' +
+        '<span class="weekly-stat-pill">Account: <strong>' + esc(profile.account_type || '—') + '</strong></span>' +
+        insightBits +
+      '</div>' +
+      '<div class="tiny muted" style="margin-top:10px">Tip: use Reels and Stories to push traffic to your strongest track.</div>'
+    );
+  }
+
+  function renderSoundCloudCardFromSaved(optionalOut){
+    optionalOut = optionalOut || {};
+    var profile = optionalOut.profile || loadJson('mb_soundcloud_profile', {}) || {};
+    var tracks = normalizeTracks(optionalOut.tracks || loadJson('mb_soundcloud_tracks', []) || []);
+    var stats = optionalOut.stats || null;
+    if (!stats) {
+      var followers = numberFrom(profile, ['followers_count','followers']);
+      var likes = 0, comments = 0, shares = 0, views = 0;
+      tracks.forEach(function(t){
+        likes += numberFrom(t, ['likes_count','favoritings_count','likes']);
+        comments += numberFrom(t, ['comment_count','comments_count','comments']);
+        shares += numberFrom(t, ['reposts_count','repost_count','shares_count','shares']);
+        views += numberFrom(t, ['playback_count','plays','play_count','stream_count']);
+      });
+      stats = { followers: followers, posts: tracks.length, likes: likes, comments: comments, shares: shares, views: views };
+    }
+    var top = tracks.slice().sort(function(a,b){ return numberFrom(b, ['playback_count','plays','play_count']) - numberFrom(a, ['playback_count','plays','play_count']); })[0];
+    upsertPlatformCard('platformCardSoundCloud',
+      '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">' +
+        '<div><div style="font-weight:900;font-size:17px">SoundCloud</div><div class="tiny muted">' + esc((profile && (profile.username || profile.full_name || profile.permalink)) || 'Connected') + '</div></div>' +
+        '<span class="tag">API</span>' +
+      '</div>' +
+      '<div class="weekly-platform-stats" style="margin-top:12px">' +
+        '<span class="weekly-stat-pill">Followers: <strong>' + fmt(stats.followers || 0) + '</strong></span>' +
+        '<span class="weekly-stat-pill">Tracks: <strong>' + fmt(stats.posts || tracks.length || 0) + '</strong></span>' +
+        '<span class="weekly-stat-pill">Plays: <strong>' + fmt(stats.views || 0) + '</strong></span>' +
+        '<span class="weekly-stat-pill">Likes: <strong>' + fmt(stats.likes || 0) + '</strong></span>' +
+        '<span class="weekly-stat-pill">Comments: <strong>' + fmt(stats.comments || 0) + '</strong></span>' +
+        '<span class="weekly-stat-pill">Reposts: <strong>' + fmt(stats.shares || 0) + '</strong></span>' +
+      '</div>' +
+      '<div class="tiny muted" style="margin-top:10px">' + (top ? 'Top recent track: <strong>' + esc(top.title || top.permalink || 'Untitled') + '</strong>' : 'Tip: reposts and comments help SoundCloud discovery.') + '</div>'
+    );
+  }
+
+  function renderUnifiedResults(ran){
     var results = qs('#aiResults');
     var signals = qs('#signalsList');
     var moves = qs('#movesList');
     var plan = qs('#planBox');
     var advice = qs('#manualAdviceBox');
     var pro = qs('#proInsightsBox');
-    var followers = profile.followers_count;
-    var mediaCount = profile.media_count;
-    var username = profile.username || 'Instagram account';
-
+    ran = ran || [];
     if (results) results.classList.remove('hidden');
     if (signals) {
-      signals.innerHTML =
-        '<li><strong>Instagram connected:</strong> @' + esc(username) + '</li>' +
-        '<li><strong>Followers:</strong> ' + esc(followers == null ? '—' : Number(followers).toLocaleString()) + '</li>' +
-        '<li><strong>Media count:</strong> ' + esc(mediaCount == null ? '—' : Number(mediaCount).toLocaleString()) + '</li>';
+      var html = [];
+      if (ran.indexOf('Instagram') >= 0) {
+        var ig = loadJson('mb_instagram_profile', {}) || {};
+        html.push('<li><strong>Instagram:</strong> @' + esc(ig.username || 'Connected') + ' • Followers: ' + fmt(ig.followers_count == null ? '—' : ig.followers_count) + '</li>');
+      }
+      if (ran.indexOf('SoundCloud') >= 0) {
+        var scp = loadJson('mb_soundcloud_profile', {}) || {};
+        var sct = normalizeTracks(loadJson('mb_soundcloud_tracks', []) || []);
+        var plays = 0; sct.forEach(function(t){ plays += numberFrom(t, ['playback_count','plays','play_count','stream_count']); });
+        html.push('<li><strong>SoundCloud:</strong> ' + esc((scp && (scp.username || scp.full_name || scp.permalink)) || 'Connected') + ' • Tracks: ' + fmt(sct.length) + ' • Plays: ' + fmt(plays) + '</li>');
+      }
+      signals.innerHTML = html.join('') || '<li>No platform stats loaded yet.</li>';
     }
     if (moves) {
-      moves.innerHTML =
-        '<li>Turn your strongest Instagram post into a Reel, Story, and short caption post.</li>' +
-        '<li>Use the same song/clip across Instagram and SoundCloud so both audiences connect.</li>' +
-        '<li>Watch comments and saves because those tell you what content people actually care about.</li>';
+      moves.innerHTML = [
+        '<li>Use Instagram for attention and SoundCloud for deeper listening.</li>',
+        '<li>Turn the best SoundCloud track into multiple Instagram Reels and Stories.</li>',
+        '<li>Keep each platform card separate so stats do not overwrite each other.</li>'
+      ].join('');
     }
     if (plan) {
-      plan.textContent =
-        'Instagram plan:\n' +
-        'Day 1: Post a Reel with the hook in the first 2 seconds.\n' +
-        'Day 2: Post behind-the-scenes content.\n' +
-        'Day 3: Ask a question in Stories.\n' +
-        'Day 4: Repost the best clip with a new caption.\n' +
-        'Day 5: Direct people to your best SoundCloud track or playlist.';
+      plan.textContent = ran.join(' + ') + ' plan:\nDay 1: Pick the strongest track or post.\nDay 2: Make 2 short clips from it.\nDay 3: Post one clip on Instagram and link/listen on SoundCloud.\nDay 4: Comment/repost with similar creators.\nDay 5: Repeat the best-performing idea.';
     }
     if (advice) {
-      advice.innerHTML = '<div style="padding:12px;border:1px solid #dbeafe;border-radius:12px;background:#f8fbff;color:#334155;font-weight:700;line-height:1.5;">Instagram API data loaded. Account: @' + esc(username) + '.</div>';
+      advice.innerHTML = '<div style="padding:12px;border:1px solid #dbeafe;border-radius:12px;background:#f8fbff;color:#334155;font-weight:700;line-height:1.55;">Stats are separated by platform below. Use the shared summary above for cross-platform strategy.</div>';
     }
     if (pro) {
-      pro.innerHTML = '<div>• Strong creators reuse one winning idea in multiple formats instead of starting from zero every day.</div><div>• They connect social content directly to one track, playlist, or release goal.</div>';
+      pro.innerHTML = '<div>• Top creators do not let one platform replace the other — they use each platform for a different job.</div><div>• Instagram gets attention. SoundCloud proves people want to listen longer.</div>';
     }
+  }
+
+  function renderInstagramResults(bundle){
+    renderInstagramCard(bundle);
   }
 
   async function analyzeInstagram(){
@@ -9455,15 +9572,21 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
         showScan(true);
         (async function(){
           var ran = [];
+          var scOut = null;
           if (shouldRunSoundCloud) {
             if (typeof window.mbAnalyzeSoundCloudOnly !== 'function') throw new Error('SoundCloud analyzer is not loaded.');
-            await window.mbAnalyzeSoundCloudOnly();
+            scOut = await window.mbAnalyzeSoundCloudOnly();
+            renderSoundCloudCardFromSaved(scOut || {});
             ran.push('SoundCloud');
           }
           if (shouldRunInstagram) {
             await analyzeInstagram();
             ran.push('Instagram');
           }
+          // Final pass writes a shared summary only. The cards keep each platform's stats separate.
+          if (ran.indexOf('SoundCloud') >= 0 && !qs('#platformCardSoundCloud')) renderSoundCloudCardFromSaved(scOut || {});
+          if (ran.indexOf('Instagram') >= 0 && !qs('#platformCardInstagram')) renderInstagramCard();
+          renderUnifiedResults(ran);
           setStatus('mbUnifiedAnalyzeStatus', 'Analyzed: <strong>' + esc(ran.join(' + ')) + '</strong>.', true);
         })().catch(function(err){
           console.error('Unified Analyze failed:', err);
