@@ -1525,7 +1525,7 @@
 </div>
 <!-- ✅ Optional: tiny helper text under YouTube -->
 <p class="tiny muted" style="margin:10px 0 0">
-          Connect Instagram, SoundCloud, or both. Then check agreement and click Analyze.
+          Connect Instagram, YouTube, SoundCloud, or any combination. Then check agreement and click Analyze.
         </p>
 </div>
 </div>
@@ -3775,10 +3775,10 @@ const MB_API_ENDPOINTS = {
   };
 
   /* =====================================================================
-   YouTube uses the standard connect + manual weekly stats flow
-   - no YouTube API fetch
-   - saves channel link/@handle on the Profile page
-   - opens the same connect modal as the other social tabs
+   YouTube OAuth is handled by the isolated YouTube module below.
+   - Google login through the Render backend
+   - pulls channel and recent video statistics
+   - saves API data into the existing weekly stats format
   ====================================================================== */
  /* =====================================================================
    2) Mikey Analyze (real stats + top creator insights + YouTube views)
@@ -4784,6 +4784,179 @@ const MB_API_ENDPOINTS = {
   window.mbStartSoundCloudOauth = mbStartSoundCloudOauth;
   window.mbFinishSoundCloudOauth = mbFinishSoundCloudOauth;
 
+
+  /* =========================
+     YOUTUBE OAUTH CONNECT
+     - Isolated from Instagram and SoundCloud.
+     - Uses the Render backend for Google OAuth and YouTube Data API calls.
+  ========================== */
+  const MB_YOUTUBE_BACKEND = 'https://musixblvd.onrender.com';
+
+  function mbShowYouTubeStatus(message, ok = true) {
+    let status = document.getElementById('mbYouTubeStatus');
+    const startBtn = document.getElementById('startAnalysis');
+
+    if (!status) {
+      status = document.createElement('p');
+      status.id = 'mbYouTubeStatus';
+      status.className = 'tiny muted';
+      status.style.margin = '10px 0 0';
+      if (startBtn && startBtn.parentElement) {
+        startBtn.parentElement.insertAdjacentElement('afterend', status);
+      }
+    }
+
+    status.textContent = message || '';
+    status.style.color = ok ? '#64748b' : '#b91c1c';
+  }
+
+  async function mbStartYouTubeOauth() {
+    mbShowYouTubeStatus('Opening Google login for YouTube...', true);
+
+    const resp = await fetch(MB_YOUTUBE_BACKEND + '/api/youtube/auth-url', {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
+    const data = await resp.json().catch(() => ({}));
+
+    if (!resp.ok || !data.auth_url || !data.state) {
+      throw new Error(data.error || 'Could not start YouTube login.');
+    }
+
+    try {
+      localStorage.setItem('mb_pending_provider', 'youtube');
+      localStorage.setItem('mb_youtube_oauth_state', data.state);
+    } catch (_error) {}
+
+    window.location.href = data.auth_url;
+  }
+
+  function mbSaveYouTubeStats(channel, videos) {
+    const stats = channel?.statistics || {};
+    const items = Array.isArray(videos?.items) ? videos.items : [];
+    const totalRecentViews = items.reduce((sum, item) => sum + Number(item?.statistics?.viewCount || 0), 0);
+    const totalRecentLikes = items.reduce((sum, item) => sum + Number(item?.statistics?.likeCount || 0), 0);
+    const totalRecentComments = items.reduce((sum, item) => sum + Number(item?.statistics?.commentCount || 0), 0);
+    const channelUrl = channel?.id ? `https://www.youtube.com/channel/${channel.id}` : '';
+
+    let store = { byPlatform: {} };
+    try { store = JSON.parse(localStorage.getItem('mb_manual_stats') || '{"byPlatform":{}}') || { byPlatform: {} }; } catch (_error) {}
+    store.byPlatform = store.byPlatform || {};
+    store.byPlatform.youtube = store.byPlatform.youtube || [];
+    store.byPlatform.youtube.push({
+      followers: Number(stats.subscriberCount || 0),
+      posts: items.length,
+      likes: items.length ? Math.round(totalRecentLikes / items.length) : 0,
+      comments: items.length ? Math.round(totalRecentComments / items.length) : 0,
+      shares: 0,
+      views: Number(stats.viewCount || totalRecentViews || 0),
+      niche: 'music / YouTube',
+      source: 'youtube_api',
+      profileUrl: channelUrl,
+      profileLabel: channel?.snippet?.title || 'YouTube',
+      date: new Date().toISOString()
+    });
+    localStorage.setItem('mb_manual_stats', JSON.stringify(store));
+  }
+
+  async function mbFinishYouTubeOauth(code) {
+    mbShowYouTubeStatus('Finishing YouTube connection...', true);
+
+    const tokenResp = await fetch(MB_YOUTUBE_BACKEND + '/api/youtube/exchange-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+    const tokenData = await tokenResp.json().catch(() => ({}));
+
+    if (!tokenResp.ok || !tokenData.access_token) {
+      throw new Error(tokenData.error_description || tokenData.error || 'YouTube token exchange failed.');
+    }
+
+    const accessToken = tokenData.access_token;
+    localStorage.setItem('mb_youtube_access_token', accessToken);
+    if (tokenData.refresh_token) localStorage.setItem('mb_youtube_refresh_token', tokenData.refresh_token);
+
+    const [channelResp, videosResp] = await Promise.all([
+      fetch(MB_YOUTUBE_BACKEND + '/api/youtube/channel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ access_token: accessToken })
+      }),
+      fetch(MB_YOUTUBE_BACKEND + '/api/youtube/videos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ access_token: accessToken, max_results: 10 })
+      })
+    ]);
+
+    const channelData = await channelResp.json().catch(() => ({}));
+    const videosData = await videosResp.json().catch(() => ({}));
+
+    if (!channelResp.ok) throw new Error(channelData.error?.message || channelData.error || 'Could not load YouTube channel.');
+    if (!videosResp.ok) console.warn('YouTube videos fetch failed:', videosData);
+
+    const channel = Array.isArray(channelData.items) ? channelData.items[0] : null;
+    if (!channel) throw new Error('Google login worked, but no YouTube channel was found on this account.');
+
+    localStorage.setItem('mb_youtube_channel', JSON.stringify(channel));
+    localStorage.setItem('mb_youtube_videos', JSON.stringify(videosData || {}));
+    mbSaveYouTubeStats(channel, videosData);
+
+    try {
+      const p = normalizeProfile(loadProfile());
+      p.socialConnected.yt = true;
+      p.socials.yt = channel.id ? `https://www.youtube.com/channel/${channel.id}` : '';
+      saveProfile(p);
+      document.dispatchEvent(new CustomEvent('mb:profile-updated', { detail: p }));
+    } catch (error) {
+      console.warn('Could not save YouTube profile state:', error);
+    }
+
+    const youtubeBtn = document.querySelector('#ai .providers .prov[data-p="youtube"]');
+    if (youtubeBtn) youtubeBtn.classList.add('active');
+    const ytStatus = document.getElementById('ytStatus');
+    if (ytStatus) ytStatus.textContent = 'Connected';
+
+    mbShowYouTubeStatus(`YouTube connected: ${channel.snippet?.title || 'channel'}. Check agreement and click Analyze my socials.`, true);
+
+    localStorage.removeItem('mb_pending_provider');
+    localStorage.removeItem('mb_youtube_oauth_state');
+    window.mbRenderManualAdvice?.();
+    window.mbRenderWeeklyStatsBoxes?.();
+  }
+
+  window.mbStartYouTubeOauth = mbStartYouTubeOauth;
+  window.mbFinishYouTubeOauth = mbFinishYouTubeOauth;
+
+  ;(async function mbHandleYouTubeCallback() {
+    const params = new URLSearchParams(window.location.search || '');
+    const code = params.get('code');
+    const state = params.get('state') || '';
+    const pending = localStorage.getItem('mb_pending_provider') || '';
+    const expectedState = localStorage.getItem('mb_youtube_oauth_state') || '';
+    const isYouTube = pending === 'youtube' || (state && expectedState && state === expectedState);
+
+    if (!code || !isYouTube) return;
+
+    try {
+      await mbFinishYouTubeOauth(code);
+    } catch (error) {
+      console.error('YouTube OAuth finish failed:', error);
+      mbShowYouTubeStatus(error?.message || 'YouTube connection failed. Check Render logs.', false);
+    } finally {
+      params.delete('code');
+      params.delete('state');
+      params.delete('scope');
+      params.delete('authuser');
+      params.delete('prompt');
+      params.delete('error');
+      params.delete('error_description');
+      const clean = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
+      window.history.replaceState({}, document.title, clean);
+    }
+  })();
+
   /* =========================
      PROVIDER CLICK HANDLER
   ========================== */
@@ -4811,6 +4984,15 @@ const MB_API_ENDPOINTS = {
       mbStartSoundCloudOauth().catch((error) => {
         console.error('SoundCloud OAuth start failed:', error);
         mbShowSoundCloudStatus(error?.message || 'Could not start SoundCloud login.', false);
+      });
+      return;
+    }
+
+    if (providerKey === 'youtube') {
+      btn.classList.add('active');
+      mbStartYouTubeOauth().catch((error) => {
+        console.error('YouTube OAuth start failed:', error);
+        mbShowYouTubeStatus(error?.message || 'Could not start YouTube login.', false);
       });
       return;
     }
