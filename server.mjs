@@ -27,8 +27,8 @@ const SOUNDCLOUD_AUTH_BASE_URL = 'https://secure.soundcloud.com/authorize';
 const SOUNDCLOUD_TOKEN_URL = 'https://secure.soundcloud.com/oauth/token';
 const SOUNDCLOUD_API_BASE_URL = 'https://api.soundcloud.com';
 
-const YOUTUBE_CLIENT_ID = process.env.YOUTUBE_CLIENT_ID || '588892999234-j7vnrpejj4o4l27bae2ul3f8n5tfp456.apps.googleusercontent.com';
-const YOUTUBE_CLIENT_SECRET = process.env.YOUTUBE_CLIENT_SECRET || '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 ';
+const YOUTUBE_CLIENT_ID = process.env.YOUTUBE_CLIENT_ID || '1084023505080-vfo45fjtui1tpuh47mrstet7h9rdm9uf.apps.googleusercontent.com';
+const YOUTUBE_CLIENT_SECRET = process.env.YOUTUBE_CLIENT_SECRET || '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';
 const YOUTUBE_REDIRECT_URI = process.env.YOUTUBE_REDIRECT_URI || 'https://musixblvd.com/dashboard.html';
 const YOUTUBE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const YOUTUBE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
