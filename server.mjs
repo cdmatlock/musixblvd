@@ -27,6 +27,14 @@ const SOUNDCLOUD_AUTH_BASE_URL = 'https://secure.soundcloud.com/authorize';
 const SOUNDCLOUD_TOKEN_URL = 'https://secure.soundcloud.com/oauth/token';
 const SOUNDCLOUD_API_BASE_URL = 'https://api.soundcloud.com';
 
+const YOUTUBE_CLIENT_ID = process.env.YOUTUBE_CLIENT_ID || '588892999234-j7vnrpejj4o4l27bae2ul3f8n5tfp456.apps.googleusercontent.com';
+const YOUTUBE_CLIENT_SECRET = process.env.YOUTUBE_CLIENT_SECRET || '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 ';
+const YOUTUBE_REDIRECT_URI = process.env.YOUTUBE_REDIRECT_URI || 'https://musixblvd.com/dashboard.html';
+const YOUTUBE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
+const YOUTUBE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
+const YOUTUBE_API_BASE_URL = 'https://www.googleapis.com/youtube/v3';
+const YOUTUBE_SCOPE = 'https://www.googleapis.com/auth/youtube.readonly';
+
 app.use(cors({
   origin: (origin, callback) => callback(null, true),
   methods: ['GET', 'POST', 'OPTIONS'],
@@ -428,6 +436,151 @@ app.post('/api/soundcloud/tracks', async (req, res) => {
   } catch (error) {
     console.error('SoundCloud tracks fetch error:', error);
     return res.status(500).json({ error: 'SoundCloud tracks fetch failed.' });
+  }
+});
+
+
+// ---------------- YouTube OAuth + channel data ----------------
+app.get('/api/youtube/auth-url', (_req, res) => {
+  try {
+    if (!YOUTUBE_CLIENT_ID) {
+      return res.status(500).json({ error: 'Missing YOUTUBE_CLIENT_ID in your environment variables.' });
+    }
+
+    const state = crypto.randomBytes(24).toString('hex');
+    const authUrl = new URL(YOUTUBE_AUTH_URL);
+    authUrl.searchParams.set('client_id', YOUTUBE_CLIENT_ID);
+    authUrl.searchParams.set('redirect_uri', YOUTUBE_REDIRECT_URI);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('scope', YOUTUBE_SCOPE);
+    authUrl.searchParams.set('access_type', 'offline');
+    authUrl.searchParams.set('include_granted_scopes', 'true');
+    authUrl.searchParams.set('prompt', 'consent');
+    authUrl.searchParams.set('state', state);
+
+    return res.json({
+      auth_url: authUrl.toString(),
+      state,
+      redirect_uri: YOUTUBE_REDIRECT_URI
+    });
+  } catch (error) {
+    console.error('YouTube auth URL error:', error);
+    return res.status(500).json({ error: 'YouTube auth URL creation failed.' });
+  }
+});
+
+app.post('/api/youtube/exchange-code', async (req, res) => {
+  try {
+    const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+
+    if (!code) {
+      return res.status(400).json({ error: 'Missing YouTube authorization code.' });
+    }
+
+    if (!YOUTUBE_CLIENT_ID || !YOUTUBE_CLIENT_SECRET) {
+      return res.status(500).json({
+        error: 'Missing YOUTUBE_CLIENT_ID or YOUTUBE_CLIENT_SECRET in your environment variables.'
+      });
+    }
+
+    const form = new URLSearchParams();
+    form.set('client_id', YOUTUBE_CLIENT_ID);
+    form.set('client_secret', YOUTUBE_CLIENT_SECRET);
+    form.set('code', code);
+    form.set('grant_type', 'authorization_code');
+    form.set('redirect_uri', YOUTUBE_REDIRECT_URI);
+
+    const tokenResp = await fetch(YOUTUBE_TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form.toString()
+    });
+
+    const tokenData = await readJsonResponse(tokenResp);
+
+    if (!tokenResp.ok) {
+      console.error('YouTube exchange error:', tokenData);
+      return res.status(tokenResp.status).json(tokenData);
+    }
+
+    return res.json(tokenData);
+  } catch (error) {
+    console.error('YouTube code exchange error:', error);
+    return res.status(500).json({ error: 'YouTube code exchange failed.' });
+  }
+});
+
+app.post('/api/youtube/channel', async (req, res) => {
+  try {
+    const accessToken = typeof req.body?.access_token === 'string' ? req.body.access_token.trim() : '';
+
+    if (!accessToken) {
+      return res.status(400).json({ error: 'Missing YouTube access token.' });
+    }
+
+    const channelUrl = new URL(`${YOUTUBE_API_BASE_URL}/channels`);
+    channelUrl.searchParams.set('part', 'snippet,statistics,contentDetails,brandingSettings');
+    channelUrl.searchParams.set('mine', 'true');
+
+    const channelResp = await fetch(channelUrl.toString(), {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/json'
+      }
+    });
+
+    const channelData = await readJsonResponse(channelResp);
+
+    if (!channelResp.ok) {
+      console.error('YouTube channel error:', channelData);
+      return res.status(channelResp.status).json(channelData);
+    }
+
+    return res.json(channelData);
+  } catch (error) {
+    console.error('YouTube channel fetch error:', error);
+    return res.status(500).json({ error: 'YouTube channel fetch failed.' });
+  }
+});
+
+app.post('/api/youtube/videos', async (req, res) => {
+  try {
+    const accessToken = typeof req.body?.access_token === 'string' ? req.body.access_token.trim() : '';
+    const playlistId = typeof req.body?.playlist_id === 'string' ? req.body.playlist_id.trim() : '';
+    const limitRaw = Number.parseInt(req.body?.limit, 10);
+    const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 50) : 10;
+
+    if (!accessToken) {
+      return res.status(400).json({ error: 'Missing YouTube access token.' });
+    }
+
+    if (!playlistId) {
+      return res.status(400).json({ error: 'Missing YouTube uploads playlist ID.' });
+    }
+
+    const videosUrl = new URL(`${YOUTUBE_API_BASE_URL}/playlistItems`);
+    videosUrl.searchParams.set('part', 'snippet,contentDetails');
+    videosUrl.searchParams.set('playlistId', playlistId);
+    videosUrl.searchParams.set('maxResults', String(limit));
+
+    const videosResp = await fetch(videosUrl.toString(), {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/json'
+      }
+    });
+
+    const videosData = await readJsonResponse(videosResp);
+
+    if (!videosResp.ok) {
+      console.error('YouTube videos error:', videosData);
+      return res.status(videosResp.status).json(videosData);
+    }
+
+    return res.json(videosData);
+  } catch (error) {
+    console.error('YouTube videos fetch error:', error);
+    return res.status(500).json({ error: 'YouTube videos fetch failed.' });
   }
 });
 
