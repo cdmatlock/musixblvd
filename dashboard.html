@@ -4828,7 +4828,9 @@ const MB_API_ENDPOINTS = {
       localStorage.setItem('mb_youtube_oauth_state', data.state);
     } catch (_error) {}
 
-    window.location.href = data.auth_url;
+    const youtubeAuthUrl = new URL(data.auth_url);
+    youtubeAuthUrl.searchParams.set('prompt', 'select_account consent');
+    window.location.href = youtubeAuthUrl.toString();
   }
 
   function mbSaveYouTubeStats(channel, videos) {
@@ -9518,6 +9520,10 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     return !!(load('mb_instagram_access_token','') || (loadJson('mb_instagram_profile', {}) || {}).username);
   }
 
+  function youtubeHasData(){
+    return !!load('mb_youtube_access_token','') || !!loadJson('mb_youtube_channel', null);
+  }
+
   function soundcloudHasData(){
     return !!(load('mb_soundcloud_access_token','') || loadJson('mb_soundcloud_api_stats', null) || loadJson('mb_soundcloud_profile', null));
   }
@@ -9639,6 +9645,55 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     );
   }
 
+  function renderYouTubeCardFromSaved(){
+    var channel = loadJson('mb_youtube_channel', {}) || {};
+    var videosBundle = loadJson('mb_youtube_videos', {}) || {};
+    var videos = Array.isArray(videosBundle.items) ? videosBundle.items : [];
+    var stats = channel.statistics || {};
+    var recentViews = 0, recentLikes = 0, recentComments = 0;
+    videos.forEach(function(v){
+      recentViews += Number(v && v.statistics && v.statistics.viewCount || 0);
+      recentLikes += Number(v && v.statistics && v.statistics.likeCount || 0);
+      recentComments += Number(v && v.statistics && v.statistics.commentCount || 0);
+    });
+    var top = videos.slice().sort(function(a,b){
+      return Number(b && b.statistics && b.statistics.viewCount || 0) - Number(a && a.statistics && a.statistics.viewCount || 0);
+    })[0];
+    upsertPlatformCard('platformCardYouTube',
+      '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">' +
+        '<div><div style="font-weight:900;font-size:17px">YouTube</div><div class="tiny muted">' + esc(channel && channel.snippet && channel.snippet.title || 'Connected channel') + '</div></div>' +
+        '<span class="tag">API</span>' +
+      '</div>' +
+      '<div class="weekly-platform-stats" style="margin-top:12px">' +
+        '<span class="weekly-stat-pill">Subscribers: <strong>' + fmt(stats.subscriberCount || 0) + '</strong></span>' +
+        '<span class="weekly-stat-pill">Channel views: <strong>' + fmt(stats.viewCount || 0) + '</strong></span>' +
+        '<span class="weekly-stat-pill">Videos: <strong>' + fmt(stats.videoCount || videos.length || 0) + '</strong></span>' +
+        '<span class="weekly-stat-pill">Recent views: <strong>' + fmt(recentViews) + '</strong></span>' +
+        '<span class="weekly-stat-pill">Recent likes: <strong>' + fmt(recentLikes) + '</strong></span>' +
+        '<span class="weekly-stat-pill">Recent comments: <strong>' + fmt(recentComments) + '</strong></span>' +
+      '</div>' +
+      '<div class="tiny muted" style="margin-top:10px">' + (top ? 'Top recent video: <strong>' + esc(top.snippet && top.snippet.title || 'Untitled') + '</strong>' : 'Tip: use Shorts to lead viewers toward your full music videos.') + '</div>'
+    );
+  }
+
+  async function analyzeYouTube(){
+    var token = load('mb_youtube_access_token','');
+    if (token) {
+      var responses = await Promise.all([
+        fetch('https://musixblvd.onrender.com/api/youtube/channel', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({access_token:token})}),
+        fetch('https://musixblvd.onrender.com/api/youtube/videos', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({access_token:token,max_results:10})})
+      ]);
+      var channelData = await responses[0].json().catch(function(){ return {}; });
+      var videosData = await responses[1].json().catch(function(){ return {}; });
+      if (!responses[0].ok) throw new Error(channelData && channelData.error && channelData.error.message || channelData.error || 'Could not refresh YouTube channel.');
+      var channel = Array.isArray(channelData.items) ? channelData.items[0] : null;
+      if (channel) localStorage.setItem('mb_youtube_channel', JSON.stringify(channel));
+      if (responses[1].ok) localStorage.setItem('mb_youtube_videos', JSON.stringify(videosData || {}));
+    }
+    if (!youtubeHasData()) throw new Error('No YouTube account is connected. Connect YouTube first.');
+    renderYouTubeCardFromSaved();
+  }
+
   function renderUnifiedResults(ran){
     var results = qs('#aiResults');
     var signals = qs('#signalsList');
@@ -9660,23 +9715,28 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
         var plays = 0; sct.forEach(function(t){ plays += numberFrom(t, ['playback_count','plays','play_count','stream_count']); });
         html.push('<li><strong>SoundCloud:</strong> ' + esc((scp && (scp.username || scp.full_name || scp.permalink)) || 'Connected') + ' • Tracks: ' + fmt(sct.length) + ' • Plays: ' + fmt(plays) + '</li>');
       }
+      if (ran.indexOf('YouTube') >= 0) {
+        var ytc = loadJson('mb_youtube_channel', {}) || {};
+        var yts = ytc.statistics || {};
+        html.push('<li><strong>YouTube:</strong> ' + esc(ytc && ytc.snippet && ytc.snippet.title || 'Connected') + ' • Subscribers: ' + fmt(yts.subscriberCount || 0) + ' • Views: ' + fmt(yts.viewCount || 0) + '</li>');
+      }
       signals.innerHTML = html.join('') || '<li>No platform stats loaded yet.</li>';
     }
     if (moves) {
       moves.innerHTML = [
-        '<li>Use Instagram for attention and SoundCloud for deeper listening.</li>',
-        '<li>Turn the best SoundCloud track into multiple Instagram Reels and Stories.</li>',
-        '<li>Keep each platform card separate so stats do not overwrite each other.</li>'
+        '<li>Use Instagram for discovery, YouTube for visual storytelling, and SoundCloud for deeper listening.</li>',
+        '<li>Turn the strongest SoundCloud track into YouTube Shorts, a full visual, and Instagram Reels.</li>',
+        '<li>Each platform keeps its own account and statistics, so connecting one does not overwrite another.</li>'
       ].join('');
     }
     if (plan) {
-      plan.textContent = ran.join(' + ') + ' plan:\nDay 1: Pick the strongest track or post.\nDay 2: Make 2 short clips from it.\nDay 3: Post one clip on Instagram and link/listen on SoundCloud.\nDay 4: Comment/repost with similar creators.\nDay 5: Repeat the best-performing idea.';
+      plan.textContent = ran.join(' + ') + ' plan:\nDay 1: Pick the strongest track, video, or post.\nDay 2: Make 2 short clips from it.\nDay 3: Post a YouTube Short and an Instagram Reel, then link the full SoundCloud track.\nDay 4: Reply to comments and engage with similar creators.\nDay 5: Repeat the best-performing format.';
     }
     if (advice) {
       advice.innerHTML = '<div style="padding:12px;border:1px solid #dbeafe;border-radius:12px;background:#f8fbff;color:#334155;font-weight:700;line-height:1.55;">Stats are separated by platform below. Use the shared summary above for cross-platform strategy.</div>';
     }
     if (pro) {
-      pro.innerHTML = '<div>• Top creators do not let one platform replace the other — they use each platform for a different job.</div><div>• Instagram gets attention. SoundCloud proves people want to listen longer.</div>';
+      pro.innerHTML = '<div>• Top creators use each platform for a different job instead of letting one replace the others.</div><div>• Instagram earns attention, YouTube builds a visual audience, and SoundCloud proves deeper listening interest.</div>';
     }
   }
 
@@ -9744,8 +9804,9 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
         var selected = selectedProviders();
         var shouldRunInstagram = selected.indexOf('instagram') >= 0 || (selected.length === 0 && instagramHasData());
         var shouldRunSoundCloud = selected.indexOf('soundcloud') >= 0 || (selected.length === 0 && soundcloudHasData());
+        var shouldRunYouTube = selected.indexOf('youtube') >= 0 || (selected.length === 0 && youtubeHasData());
 
-        if (!shouldRunInstagram && !shouldRunSoundCloud) return;
+        if (!shouldRunInstagram && !shouldRunSoundCloud && !shouldRunYouTube) return;
 
         e.preventDefault();
         e.stopPropagation();
@@ -9761,6 +9822,10 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
             renderSoundCloudCardFromSaved(scOut || {});
             ran.push('SoundCloud');
           }
+          if (shouldRunYouTube) {
+            await analyzeYouTube();
+            ran.push('YouTube');
+          }
           if (shouldRunInstagram) {
             await analyzeInstagram();
             ran.push('Instagram');
@@ -9768,6 +9833,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
           // Final pass writes a shared summary only. The cards keep each platform's stats separate.
           if (ran.indexOf('SoundCloud') >= 0 && !qs('#platformCardSoundCloud')) renderSoundCloudCardFromSaved(scOut || {});
           if (ran.indexOf('Instagram') >= 0 && !qs('#platformCardInstagram')) renderInstagramCard();
+          if (ran.indexOf('YouTube') >= 0 && !qs('#platformCardYouTube')) renderYouTubeCardFromSaved();
           renderUnifiedResults(ran);
           setStatus('mbUnifiedAnalyzeStatus', 'Analyzed: <strong>' + esc(ran.join(' + ')) + '</strong>.', true);
         })().catch(function(err){
