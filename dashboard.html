@@ -198,19 +198,6 @@
     .providers{display:flex; flex-wrap:wrap; gap:8px; margin:10px 0}
     .prov{appearance:none; border:1px solid var(--border); background:#fff; padding:8px 12px; border-radius:999px; font-weight:700; cursor:pointer}
     .prov.active{border-color:#93c5fd; box-shadow:0 0 0 3px #93c5fd44}
-    .prov.connected{position:relative;border-color:#86efac;}
-    .prov.connected::after{
-      content:"";
-      position:absolute;
-      top:-5px;
-      right:-5px;
-      width:9px;
-      height:9px;
-      border-radius:50%;
-      background:#22c55e;
-      border:2px solid #fff;
-    }
-
     .check{display:inline-flex; align-items:center; gap:8px}
 
     /* ---------- Mascot image ---------- */
@@ -1538,7 +1525,7 @@
 </div>
 <!-- ✅ Optional: tiny helper text under YouTube -->
 <p class="tiny muted" style="margin:10px 0 0">
-          Connect your accounts once. Then click any connected platform button to select 1, several, or all platforms for this analysis.
+          Connect Instagram, YouTube, SoundCloud, or any combination. Then check agreement and click Analyze.
         </p>
 </div>
 </div>
@@ -3833,8 +3820,7 @@ const MB_API_ENDPOINTS = {
           ? !!p.streaming[mapped.key]
           : !!p.socialConnected[mapped.key];
 
-      btn.classList.toggle('connected', isOn);
-      if (!isOn) btn.classList.remove('active');
+      btn.classList.toggle('active', isOn);
     });
 
     refreshProfileConnectionUI(p);
@@ -4647,18 +4633,7 @@ const MB_API_ENDPOINTS = {
         ? !!p.socialConnected[mapped.profileKey]
         : !!p.streaming[mapped.profileKey];
 
-      btn.classList.toggle('connected', isOn);
-      if (!isOn) btn.classList.remove('active');
-    });
-
-    // The provider just connected is selected for this analysis only.
-    document.querySelectorAll('#ai .providers .prov[data-p]').forEach((btn) => {
-      const raw = btn.dataset.p || btn.getAttribute('data-p') || btn.textContent;
-      const mapped = mapProvider(raw);
-      if (mapped && current && mapped.key === current.key) {
-        btn.classList.add('active');
-        btn.classList.add('connected');
-      }
+      btn.classList.toggle('active', isOn);
     });
 
     if (typeof refreshProfileConnectionUI === 'function') {
@@ -4795,7 +4770,7 @@ const MB_API_ENDPOINTS = {
     }
 
     const soundBtn = document.querySelector('#ai .providers .prov[data-p="soundcloud"]');
-    if (soundBtn) { soundBtn.classList.add('connected'); soundBtn.classList.add('active'); }
+    if (soundBtn) soundBtn.classList.add('active');
 
     mbShowSoundCloudStatus('SoundCloud connected. Now check the agreement box and click Analyze my socials when you are ready.', true);
 
@@ -4941,7 +4916,7 @@ const MB_API_ENDPOINTS = {
     }
 
     const youtubeBtn = document.querySelector('#ai .providers .prov[data-p="youtube"]');
-    if (youtubeBtn) { youtubeBtn.classList.add('connected'); youtubeBtn.classList.add('active'); }
+    if (youtubeBtn) youtubeBtn.classList.add('active');
     const ytStatus = document.getElementById('ytStatus');
     if (ytStatus) ytStatus.textContent = 'Connected';
 
@@ -5005,33 +4980,6 @@ const MB_API_ENDPOINTS = {
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
-
-    // Connected and selected are different states.
-    // If this account is already connected, a click simply selects/unselects
-    // it for the NEXT Analyze run instead of forcing another OAuth login.
-    const mappedProvider = mapProvider(providerKeyRaw);
-    let alreadyConnected = false;
-    try {
-      const profile = normalizeProfile(loadProfile());
-      if (providerKey === 'instagram') {
-        alreadyConnected = !!localStorage.getItem('mb_instagram_access_token') || !!profile.socialConnected?.ig;
-      } else if (providerKey === 'youtube') {
-        alreadyConnected = !!localStorage.getItem('mb_youtube_access_token') || !!profile.socialConnected?.yt;
-      } else if (providerKey === 'soundcloud') {
-        alreadyConnected = !!localStorage.getItem('mb_soundcloud_access_token') || !!profile.streaming?.soundcloud;
-      } else if (mappedProvider) {
-        alreadyConnected = mappedProvider.kind === 'social'
-          ? !!profile.socialConnected?.[mappedProvider.profileKey]
-          : !!profile.streaming?.[mappedProvider.profileKey];
-      }
-    } catch (_error) {}
-
-    if (alreadyConnected) {
-      btn.classList.add('connected');
-      btn.classList.toggle('active');
-      window.mbSyncAnalyzeButton?.();
-      return;
-    }
 
     if (providerKey === 'soundcloud') {
       btn.classList.add('active');
@@ -5762,7 +5710,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const aiBtn = document.querySelector(`#ai .providers .prov[data-p="${cfg.aiProv}"]`)
       || document.querySelector(`#library .lib-providers .prov[data-p="${cfg.aiProv}"]`);
-    if (aiBtn) { aiBtn.classList.remove('active'); aiBtn.classList.remove('connected'); }
+    if (aiBtn) aiBtn.classList.remove('active');
 
     window.mbRenderProfileViews?.();
     window.mbRenderManualAdvice?.();
@@ -9551,7 +9499,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     if (tokenData.user_id) save('mb_instagram_user_id', String(tokenData.user_id));
     var bundle = await fetchInstagramBundle(token);
     var igBtn = qs('#ai .providers .prov[data-p="instagram"]');
-    if (igBtn) { igBtn.classList.add('connected'); igBtn.classList.add('active'); }
+    if (igBtn) igBtn.classList.add('active');
     try {
       var p = loadJson('mb_profile', {});
       p.socialConnected = p.socialConnected || {};
@@ -9812,49 +9760,6 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     }).filter(Boolean);
   }
 
-  function normalizeSelectedProviderKey(raw){
-    var k = String(raw || '').trim().toLowerCase();
-    if (k === 'apple music') return 'apple';
-    if (k === 'x / twitter' || k === 'x') return 'twitter';
-    return k;
-  }
-
-  function latestManualPlatformStats(platform){
-    var key = normalizeSelectedProviderKey(platform);
-    var store = loadJson('mb_manual_stats', {byPlatform:{}}) || {byPlatform:{}};
-    var rows = store.byPlatform && store.byPlatform[key];
-    if (!rows && key === 'twitter') rows = store.byPlatform && store.byPlatform.x;
-    if (!rows) return null;
-    if (Array.isArray(rows)) return rows.length ? rows[rows.length - 1] : null;
-    return (rows && typeof rows === 'object') ? rows : null;
-  }
-
-  function renderManualSelectedPlatform(platform){
-    var key = normalizeSelectedProviderKey(platform);
-    var latest = latestManualPlatformStats(key);
-    if (!latest) return false;
-    var titleMap = {
-      tiktok:'TikTok', facebook:'Facebook', twitter:'X / Twitter',
-      spotify:'Spotify', apple:'Apple Music', ytmusic:'YouTube Music'
-    };
-    var title = titleMap[key] || key;
-    upsertPlatformCard('platformCardManual_' + key.replace(/[^a-z0-9_-]/g,'_'),
-      '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">' +
-        '<div><div style="font-weight:900;font-size:17px">' + esc(title) + '</div><div class="tiny muted">' + esc(latest.profileLabel || latest.niche || 'Saved stats') + '</div></div>' +
-        '<span class="tag">Saved</span>' +
-      '</div>' +
-      '<div class="weekly-platform-stats" style="margin-top:12px">' +
-        '<span class="weekly-stat-pill">Followers: <strong>' + fmt(latest.followers || 0) + '</strong></span>' +
-        '<span class="weekly-stat-pill">Posts: <strong>' + fmt(latest.posts || 0) + '</strong></span>' +
-        '<span class="weekly-stat-pill">Views: <strong>' + fmt(latest.views || 0) + '</strong></span>' +
-        '<span class="weekly-stat-pill">Likes: <strong>' + fmt(latest.likes || 0) + '</strong></span>' +
-        '<span class="weekly-stat-pill">Comments: <strong>' + fmt(latest.comments || 0) + '</strong></span>' +
-        '<span class="weekly-stat-pill">Shares: <strong>' + fmt(latest.shares || 0) + '</strong></span>' +
-      '</div>'
-    );
-    return true;
-  }
-
   async function finishOauthIfNeeded(){
     var params = new URLSearchParams(window.location.search || '');
     var code = params.get('code');
@@ -9896,11 +9801,12 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
         var agree = qs('#agree');
         if (agree && !agree.checked) return;
 
-        var selected = selectedProviders().map(normalizeSelectedProviderKey);
+        var selected = selectedProviders();
+        var shouldRunInstagram = selected.indexOf('instagram') >= 0 || (selected.length === 0 && instagramHasData());
+        var shouldRunSoundCloud = selected.indexOf('soundcloud') >= 0 || (selected.length === 0 && soundcloudHasData());
+        var shouldRunYouTube = selected.indexOf('youtube') >= 0 || (selected.length === 0 && youtubeHasData());
 
-        // Analyze ONLY the buttons selected for this run.
-        // Connected accounts that are not selected are left alone.
-        if (!selected.length) return;
+        if (!shouldRunInstagram && !shouldRunSoundCloud && !shouldRunYouTube) return;
 
         e.preventDefault();
         e.stopPropagation();
@@ -9909,51 +9815,38 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
         showScan(true);
         (async function(){
           var ran = [];
-          var failures = [];
+          var failed = [];
           var scOut = null;
 
-          async function runOne(label, fn){
+          async function runProvider(label, fn){
             try {
               await fn();
               ran.push(label);
-            } catch(err) {
+            } catch (err) {
               console.error(label + ' analyze failed:', err);
-              failures.push(label + ': ' + (err && err.message ? err.message : 'Unknown error'));
+              failed.push(label + ': ' + (err && err.message ? err.message : 'Unknown error'));
             }
           }
 
-          if (selected.indexOf('soundcloud') >= 0) {
-            await runOne('SoundCloud', async function(){
+          if (shouldRunSoundCloud) {
+            await runProvider('SoundCloud', async function(){
               if (typeof window.mbAnalyzeSoundCloudOnly !== 'function') throw new Error('SoundCloud analyzer is not loaded.');
               scOut = await window.mbAnalyzeSoundCloudOnly();
               renderSoundCloudCardFromSaved(scOut || {});
             });
           }
 
-          if (selected.indexOf('youtube') >= 0) {
-            await runOne('YouTube', async function(){
+          if (shouldRunYouTube) {
+            await runProvider('YouTube', async function(){
               await analyzeYouTube();
             });
           }
 
-          if (selected.indexOf('instagram') >= 0) {
-            await runOne('Instagram', async function(){
+          if (shouldRunInstagram) {
+            await runProvider('Instagram', async function(){
               await analyzeInstagram();
             });
           }
-
-          // Platforms currently using saved/manual weekly stats can also be
-          // selected independently and displayed without forcing another platform.
-          ['tiktok','facebook','twitter','spotify','apple','ytmusic'].forEach(function(key){
-            if (selected.indexOf(key) >= 0) {
-              if (renderManualSelectedPlatform(key)) {
-                var labels = {tiktok:'TikTok',facebook:'Facebook',twitter:'X / Twitter',spotify:'Spotify',apple:'Apple Music',ytmusic:'YouTube Music'};
-                ran.push(labels[key] || key);
-              } else {
-                failures.push((key === 'twitter' ? 'X / Twitter' : key) + ': no saved stats yet.');
-              }
-            }
-          });
 
           if (ran.indexOf('SoundCloud') >= 0 && !qs('#platformCardSoundCloud')) renderSoundCloudCardFromSaved(scOut || {});
           if (ran.indexOf('Instagram') >= 0 && !qs('#platformCardInstagram')) renderInstagramCard();
@@ -9961,11 +9854,11 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
 
           renderUnifiedResults(ran);
 
-          if (failures.length) {
+          if (failed.length) {
             setStatus(
               'mbUnifiedAnalyzeStatus',
               (ran.length ? 'Analyzed: <strong>' + esc(ran.join(' + ')) + '</strong>. ' : '') +
-              'Needs attention: ' + esc(failures.join(' | ')),
+              'Needs attention: ' + esc(failed.join(' | ')),
               ran.length > 0
             );
           } else {
