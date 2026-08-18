@@ -20,20 +20,50 @@ const __dirname = path.dirname(__filename);
 const INSTAGRAM_APP_ID = process.env.INSTAGRAM_APP_ID || '3223245321188975';
 const INSTAGRAM_APP_SECRET = process.env.INSTAGRAM_APP_SECRET || '';
 const INSTAGRAM_REDIRECT_URI = 'https://musixblvd.com/dashboard.html';
-const SOUNDCLOUD_CLIENT_ID = process.env.SOUNDCLOUD_CLIENT_ID || 'FvV3lV2BnybFVs0YkD8dE4SjXqhQ5aBa';
-const SOUNDCLOUD_CLIENT_SECRET = process.env.SOUNDCLOUD_CLIENT_SECRET || 'UfQPLMwNI0vhrvegSpBpoMg3dsuaaUoN';
+const SOUNDCLOUD_CLIENT_ID = process.env.SOUNDCLOUD_CLIENT_ID || '';
+const SOUNDCLOUD_CLIENT_SECRET = process.env.SOUNDCLOUD_CLIENT_SECRET || '';
 const SOUNDCLOUD_REDIRECT_URI = process.env.SOUNDCLOUD_REDIRECT_URI || 'https://musixblvd.com/dashboard.html';
 const SOUNDCLOUD_AUTH_BASE_URL = 'https://secure.soundcloud.com/authorize';
 const SOUNDCLOUD_TOKEN_URL = 'https://secure.soundcloud.com/oauth/token';
 const SOUNDCLOUD_API_BASE_URL = 'https://api.soundcloud.com';
 
-const YOUTUBE_CLIENT_ID = process.env.YOUTUBE_CLIENT_ID || '1084023505080-vfo45fjtui1tpuh47mrstet7h9rdm9uf.apps.googleusercontent.com';
-const YOUTUBE_CLIENT_SECRET = process.env.YOUTUBE_CLIENT_SECRET || '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';
+const YOUTUBE_CLIENT_ID = process.env.YOUTUBE_CLIENT_ID || '';
+const YOUTUBE_CLIENT_SECRET = process.env.YOUTUBE_CLIENT_SECRET || '';
 const YOUTUBE_REDIRECT_URI = process.env.YOUTUBE_REDIRECT_URI || 'https://musixblvd.com/dashboard.html';
 const YOUTUBE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const YOUTUBE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const YOUTUBE_API_BASE_URL = 'https://www.googleapis.com/youtube/v3';
 const YOUTUBE_SCOPE = 'https://www.googleapis.com/auth/youtube.readonly';
+
+// ---------------- Additional provider configuration ----------------
+const TIKTOK_CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY || 'awzrpugp2i4c48x0';
+const TIKTOK_CLIENT_SECRET = process.env.TIKTOK_CLIENT_SECRET || 'xskxj3O5VLKMVgYCT0JgTdaNbgVrkZaV';
+const TIKTOK_REDIRECT_URI = process.env.TIKTOK_REDIRECT_URI || 'https://musixblvd.com/dashboard.html';
+const TIKTOK_AUTH_URL = 'https://www.tiktok.com/v2/auth/authorize/';
+const TIKTOK_TOKEN_URL = 'https://open.tiktokapis.com/v2/oauth/token/';
+const TIKTOK_API_BASE_URL = 'https://open.tiktokapis.com/v2';
+const TIKTOK_SCOPE = 'user.info.basic,user.info.profile,user.info.stats,video.list';
+
+const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || '';
+const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || '';
+const SPOTIFY_REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI || 'https://musixblvd.com/dashboard.html';
+const SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize';
+const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
+const SPOTIFY_API_BASE_URL = 'https://api.spotify.com/v1';
+const SPOTIFY_SCOPE = 'user-read-private user-read-email';
+
+const X_CLIENT_ID = process.env.X_CLIENT_ID || '';
+const X_CLIENT_SECRET = process.env.X_CLIENT_SECRET || '';
+const X_REDIRECT_URI = process.env.X_REDIRECT_URI || 'https://musixblvd.com/dashboard.html';
+const X_AUTH_URL = 'https://x.com/i/oauth2/authorize';
+const X_TOKEN_URL = 'https://api.x.com/2/oauth2/token';
+const X_API_BASE_URL = 'https://api.x.com/2';
+const X_SCOPE = 'users.read tweet.read offline.access';
+
+const APPLE_TEAM_ID = process.env.APPLE_TEAM_ID || '';
+const APPLE_KEY_ID = process.env.APPLE_KEY_ID || '';
+const APPLE_PRIVATE_KEY = (process.env.APPLE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
+
 
 app.use(cors({
   origin: (origin, callback) => callback(null, true),
@@ -57,6 +87,37 @@ function makeSoundCloudCodeChallenge(codeVerifier) {
     .createHash('sha256')
     .update(codeVerifier)
     .digest('base64url');
+}
+
+
+function makePkcePair() {
+  const verifier = crypto.randomBytes(64).toString('base64url');
+  const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
+  return { verifier, challenge };
+}
+
+function base64UrlJson(value) {
+  return Buffer.from(JSON.stringify(value)).toString('base64url');
+}
+
+function createAppleDeveloperToken() {
+  if (!APPLE_TEAM_ID || !APPLE_KEY_ID || !APPLE_PRIVATE_KEY) return '';
+
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: 'ES256', kid: APPLE_KEY_ID };
+  const payload = {
+    iss: APPLE_TEAM_ID,
+    iat: now,
+    exp: now + (60 * 60)
+  };
+
+  const signingInput = `${base64UrlJson(header)}.${base64UrlJson(payload)}`;
+  const signature = crypto.sign('sha256', Buffer.from(signingInput), {
+    key: APPLE_PRIVATE_KEY,
+    dsaEncoding: 'ieee-p1363'
+  }).toString('base64url');
+
+  return `${signingInput}.${signature}`;
 }
 
 async function readJsonResponse(response) {
@@ -584,6 +645,345 @@ app.post('/api/youtube/videos', async (req, res) => {
   }
 });
 
+
+
+// ============================================================================
+// TikTok OAuth + Display API
+// ============================================================================
+app.get('/api/tiktok/auth-url', (_req, res) => {
+  try {
+    if (!TIKTOK_CLIENT_KEY) {
+      return res.status(503).json({ error: 'TikTok is not configured yet. Add TIKTOK_CLIENT_KEY in Render.' });
+    }
+
+    const state = crypto.randomBytes(24).toString('hex');
+    const authUrl = new URL(TIKTOK_AUTH_URL);
+    authUrl.searchParams.set('client_key', TIKTOK_CLIENT_KEY);
+    authUrl.searchParams.set('scope', TIKTOK_SCOPE);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('redirect_uri', TIKTOK_REDIRECT_URI);
+    authUrl.searchParams.set('state', state);
+
+    return res.json({ auth_url: authUrl.toString(), state, redirect_uri: TIKTOK_REDIRECT_URI });
+  } catch (error) {
+    console.error('TikTok auth URL error:', error);
+    return res.status(500).json({ error: 'TikTok auth URL creation failed.' });
+  }
+});
+
+app.post('/api/tiktok/exchange-code', async (req, res) => {
+  try {
+    const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+    if (!code) return res.status(400).json({ error: 'Missing TikTok authorization code.' });
+    if (!TIKTOK_CLIENT_KEY || !TIKTOK_CLIENT_SECRET) {
+      return res.status(503).json({ error: 'TikTok Client Key/Secret are not configured in Render.' });
+    }
+
+    const form = new URLSearchParams();
+    form.set('client_key', TIKTOK_CLIENT_KEY);
+    form.set('client_secret', TIKTOK_CLIENT_SECRET);
+    form.set('code', code);
+    form.set('grant_type', 'authorization_code');
+    form.set('redirect_uri', TIKTOK_REDIRECT_URI);
+
+    const response = await fetch(TIKTOK_TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Cache-Control': 'no-cache' },
+      body: form.toString()
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok) return res.status(response.status).json(data);
+    return res.json(data);
+  } catch (error) {
+    console.error('TikTok token exchange error:', error);
+    return res.status(500).json({ error: 'TikTok token exchange failed.' });
+  }
+});
+
+app.post('/api/tiktok/refresh-token', async (req, res) => {
+  try {
+    const refreshToken = typeof req.body?.refresh_token === 'string' ? req.body.refresh_token.trim() : '';
+    if (!refreshToken) return res.status(400).json({ error: 'Missing TikTok refresh token.' });
+
+    const form = new URLSearchParams();
+    form.set('client_key', TIKTOK_CLIENT_KEY);
+    form.set('client_secret', TIKTOK_CLIENT_SECRET);
+    form.set('grant_type', 'refresh_token');
+    form.set('refresh_token', refreshToken);
+
+    const response = await fetch(TIKTOK_TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form.toString()
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok) return res.status(response.status).json(data);
+    return res.json(data);
+  } catch (error) {
+    console.error('TikTok refresh error:', error);
+    return res.status(500).json({ error: 'TikTok token refresh failed.' });
+  }
+});
+
+app.post('/api/tiktok/user', async (req, res) => {
+  try {
+    const accessToken = typeof req.body?.access_token === 'string' ? req.body.access_token.trim() : '';
+    if (!accessToken) return res.status(400).json({ error: 'Missing TikTok access token.' });
+
+    const url = new URL(`${TIKTOK_API_BASE_URL}/user/info/`);
+    url.searchParams.set(
+      'fields',
+      'open_id,union_id,avatar_url,avatar_url_100,avatar_large_url,display_name,username,bio_description,profile_deep_link,is_verified,follower_count,following_count,likes_count,video_count'
+    );
+
+    const response = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' }
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok || (data?.error?.code && data.error.code !== 'ok')) {
+      return res.status(response.ok ? 400 : response.status).json(data);
+    }
+    return res.json(data);
+  } catch (error) {
+    console.error('TikTok user error:', error);
+    return res.status(500).json({ error: 'TikTok user fetch failed.' });
+  }
+});
+
+app.post('/api/tiktok/videos', async (req, res) => {
+  try {
+    const accessToken = typeof req.body?.access_token === 'string' ? req.body.access_token.trim() : '';
+    const maxRaw = Number.parseInt(req.body?.max_count, 10);
+    const maxCount = Number.isFinite(maxRaw) ? Math.min(Math.max(maxRaw, 1), 20) : 10;
+    if (!accessToken) return res.status(400).json({ error: 'Missing TikTok access token.' });
+
+    const url = new URL(`${TIKTOK_API_BASE_URL}/video/list/`);
+    url.searchParams.set(
+      'fields',
+      'id,title,video_description,duration,cover_image_url,embed_link,share_url,create_time,view_count,like_count,comment_count,share_count'
+    );
+
+    const response = await fetch(url.toString(), {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json'
+      },
+      body: JSON.stringify({ max_count: maxCount })
+    });
+
+    const data = await readJsonResponse(response);
+    if (!response.ok || (data?.error?.code && data.error.code !== 'ok')) {
+      return res.status(response.ok ? 400 : response.status).json(data);
+    }
+    return res.json(data);
+  } catch (error) {
+    console.error('TikTok videos error:', error);
+    return res.status(500).json({ error: 'TikTok video fetch failed.' });
+  }
+});
+
+// ============================================================================
+// Spotify OAuth (ready when Spotify developer credentials are added)
+// ============================================================================
+app.get('/api/spotify/auth-url', (_req, res) => {
+  try {
+    if (!SPOTIFY_CLIENT_ID) {
+      return res.status(503).json({ error: 'Spotify is not configured yet. Add SPOTIFY_CLIENT_ID in Render.' });
+    }
+    const state = crypto.randomBytes(24).toString('hex');
+    const authUrl = new URL(SPOTIFY_AUTH_URL);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('client_id', SPOTIFY_CLIENT_ID);
+    authUrl.searchParams.set('scope', SPOTIFY_SCOPE);
+    authUrl.searchParams.set('redirect_uri', SPOTIFY_REDIRECT_URI);
+    authUrl.searchParams.set('state', state);
+    return res.json({ auth_url: authUrl.toString(), state, redirect_uri: SPOTIFY_REDIRECT_URI });
+  } catch (error) {
+    return res.status(500).json({ error: 'Spotify auth URL creation failed.' });
+  }
+});
+
+app.post('/api/spotify/exchange-code', async (req, res) => {
+  try {
+    const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+    if (!code) return res.status(400).json({ error: 'Missing Spotify authorization code.' });
+    if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
+      return res.status(503).json({ error: 'Spotify Client ID/Secret are not configured in Render.' });
+    }
+
+    const form = new URLSearchParams();
+    form.set('grant_type', 'authorization_code');
+    form.set('code', code);
+    form.set('redirect_uri', SPOTIFY_REDIRECT_URI);
+
+    const basic = Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64');
+    const response = await fetch(SPOTIFY_TOKEN_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${basic}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: form.toString()
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok) return res.status(response.status).json(data);
+    return res.json(data);
+  } catch (error) {
+    return res.status(500).json({ error: 'Spotify token exchange failed.' });
+  }
+});
+
+app.post('/api/spotify/refresh-token', async (req, res) => {
+  try {
+    const refreshToken = typeof req.body?.refresh_token === 'string' ? req.body.refresh_token.trim() : '';
+    if (!refreshToken) return res.status(400).json({ error: 'Missing Spotify refresh token.' });
+    const form = new URLSearchParams();
+    form.set('grant_type', 'refresh_token');
+    form.set('refresh_token', refreshToken);
+    const basic = Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64');
+    const response = await fetch(SPOTIFY_TOKEN_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${basic}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: form.toString()
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok) return res.status(response.status).json(data);
+    return res.json(data);
+  } catch (error) {
+    return res.status(500).json({ error: 'Spotify token refresh failed.' });
+  }
+});
+
+app.post('/api/spotify/me', async (req, res) => {
+  try {
+    const accessToken = typeof req.body?.access_token === 'string' ? req.body.access_token.trim() : '';
+    if (!accessToken) return res.status(400).json({ error: 'Missing Spotify access token.' });
+    const response = await fetch(`${SPOTIFY_API_BASE_URL}/me`, {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' }
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok) return res.status(response.status).json(data);
+    return res.json(data);
+  } catch (error) {
+    return res.status(500).json({ error: 'Spotify profile fetch failed.' });
+  }
+});
+
+// ============================================================================
+// X OAuth 2.0 + PKCE (ready when X developer credentials are added)
+// ============================================================================
+app.get('/api/x/auth-url', (_req, res) => {
+  try {
+    if (!X_CLIENT_ID) {
+      return res.status(503).json({ error: 'X is not configured yet. Add X_CLIENT_ID in Render.' });
+    }
+    const { verifier, challenge } = makePkcePair();
+    const state = crypto.randomBytes(24).toString('hex');
+    const authUrl = new URL(X_AUTH_URL);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('client_id', X_CLIENT_ID);
+    authUrl.searchParams.set('redirect_uri', X_REDIRECT_URI);
+    authUrl.searchParams.set('scope', X_SCOPE);
+    authUrl.searchParams.set('state', state);
+    authUrl.searchParams.set('code_challenge', challenge);
+    authUrl.searchParams.set('code_challenge_method', 'S256');
+    return res.json({
+      auth_url: authUrl.toString(),
+      state,
+      code_verifier: verifier,
+      redirect_uri: X_REDIRECT_URI
+    });
+  } catch (error) {
+    return res.status(500).json({ error: 'X auth URL creation failed.' });
+  }
+});
+
+app.post('/api/x/exchange-code', async (req, res) => {
+  try {
+    const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+    const verifier = typeof req.body?.code_verifier === 'string' ? req.body.code_verifier.trim() : '';
+    if (!code || !verifier) return res.status(400).json({ error: 'Missing X code or PKCE verifier.' });
+    if (!X_CLIENT_ID) return res.status(503).json({ error: 'X Client ID is not configured in Render.' });
+
+    const form = new URLSearchParams();
+    form.set('code', code);
+    form.set('grant_type', 'authorization_code');
+    form.set('client_id', X_CLIENT_ID);
+    form.set('redirect_uri', X_REDIRECT_URI);
+    form.set('code_verifier', verifier);
+
+    const headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
+    if (X_CLIENT_SECRET) {
+      headers.Authorization = `Basic ${Buffer.from(`${X_CLIENT_ID}:${X_CLIENT_SECRET}`).toString('base64')}`;
+    }
+
+    const response = await fetch(X_TOKEN_URL, { method: 'POST', headers, body: form.toString() });
+    const data = await readJsonResponse(response);
+    if (!response.ok) return res.status(response.status).json(data);
+    return res.json(data);
+  } catch (error) {
+    return res.status(500).json({ error: 'X token exchange failed.' });
+  }
+});
+
+app.post('/api/x/me', async (req, res) => {
+  try {
+    const accessToken = typeof req.body?.access_token === 'string' ? req.body.access_token.trim() : '';
+    if (!accessToken) return res.status(400).json({ error: 'Missing X access token.' });
+
+    const url = new URL(`${X_API_BASE_URL}/users/me`);
+    url.searchParams.set(
+      'user.fields',
+      'created_at,description,verified,public_metrics,profile_image_url,location,url,protected'
+    );
+
+    const response = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' }
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok) return res.status(response.status).json(data);
+    return res.json(data);
+  } catch (error) {
+    return res.status(500).json({ error: 'X profile fetch failed.' });
+  }
+});
+
+// ============================================================================
+// Apple Music preparation.
+// MusicKit on the Web handles the user's Apple Music authorization in-browser.
+// This endpoint supplies the short-lived developer token once Apple credentials exist.
+// ============================================================================
+app.get('/api/apple/developer-token', (_req, res) => {
+  try {
+    const token = createAppleDeveloperToken();
+    if (!token) {
+      return res.status(503).json({
+        error: 'Apple Music is not configured yet. Add APPLE_TEAM_ID, APPLE_KEY_ID, and APPLE_PRIVATE_KEY in Render.'
+      });
+    }
+    return res.json({ developer_token: token });
+  } catch (error) {
+    console.error('Apple developer token error:', error);
+    return res.status(500).json({ error: 'Could not create Apple Music developer token.' });
+  }
+});
+
+app.get('/api/providers/status', (_req, res) => {
+  return res.json({
+    instagram: !!INSTAGRAM_APP_ID && !!INSTAGRAM_APP_SECRET,
+    soundcloud: !!SOUNDCLOUD_CLIENT_ID && !!SOUNDCLOUD_CLIENT_SECRET,
+    youtube: !!YOUTUBE_CLIENT_ID && !!YOUTUBE_CLIENT_SECRET,
+    tiktok: !!TIKTOK_CLIENT_KEY && !!TIKTOK_CLIENT_SECRET,
+    spotify: !!SPOTIFY_CLIENT_ID && !!SPOTIFY_CLIENT_SECRET,
+    x: !!X_CLIENT_ID,
+    apple: !!APPLE_TEAM_ID && !!APPLE_KEY_ID && !!APPLE_PRIVATE_KEY
+  });
+});
 
 app.get('*', (_req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard.html'));
