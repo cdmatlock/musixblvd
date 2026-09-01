@@ -1525,7 +1525,7 @@
 </div>
 <!-- ✅ Optional: tiny helper text under YouTube -->
 <p class="tiny muted" style="margin:10px 0 0">
-          Connect any available platform, then check agreement and click Analyze. Each platform keeps its own stats.
+          Connect Instagram, Facebook, YouTube, SoundCloud, or any combination. Then check agreement and click Analyze.
         </p>
 </div>
 </div>
@@ -4959,329 +4959,6 @@ const MB_API_ENDPOINTS = {
     }
   })();
 
-
-  /* =========================
-     EXPANDED PROVIDERS
-     TikTok works now when matching server routes are deployed.
-     Spotify/X/Apple are prewired and activate when their server credentials exist.
-  ========================== */
-  const MB_EXTRA_PROVIDER_BACKEND = 'https://musixblvd.onrender.com';
-
-  function mbExtraSave(key, value) {
-    try { localStorage.setItem(key, value); } catch (_error) {}
-  }
-  function mbExtraLoad(key, fallback = '') {
-    try {
-      const value = localStorage.getItem(key);
-      return value == null ? fallback : value;
-    } catch (_error) {
-      return fallback;
-    }
-  }
-  function mbExtraSaveJson(key, value) {
-    try { localStorage.setItem(key, JSON.stringify(value)); } catch (_error) {}
-  }
-  function mbExtraLoadJson(key, fallback) {
-    try {
-      const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : fallback;
-    } catch (_error) {
-      return fallback;
-    }
-  }
-  async function mbExtraGet(path) {
-    const response = await fetch(MB_EXTRA_PROVIDER_BACKEND + path, {
-      headers: { Accept: 'application/json' }
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(data.error_description || data.error || data.message || 'Provider request failed.');
-    }
-    return data;
-  }
-  async function mbExtraPost(path, body) {
-    const response = await fetch(MB_EXTRA_PROVIDER_BACKEND + path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify(body || {})
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(data.error_description || data.error || data.message || 'Provider request failed.');
-    }
-    return data;
-  }
-  function mbExtraPushWeeklyStats(platform, row) {
-    const store = mbExtraLoadJson('mb_manual_stats', { byPlatform: {} }) || { byPlatform: {} };
-    store.byPlatform = store.byPlatform || {};
-    store.byPlatform[platform] = Array.isArray(store.byPlatform[platform]) ? store.byPlatform[platform] : [];
-    store.byPlatform[platform].push({
-      ...(row || {}),
-      date: new Date().toISOString()
-    });
-    mbExtraSaveJson('mb_manual_stats', store);
-    try { window.mbRenderWeeklyStatsBoxes?.(); } catch (_error) {}
-    try { window.mbRenderManualAdvice?.(); } catch (_error) {}
-  }
-  function mbExtraUpdateProfile(provider, profileUrl) {
-    try {
-      let p = typeof normalizeProfile === 'function'
-        ? normalizeProfile(loadProfile())
-        : (mbExtraLoadJson('mb_profile', {}) || {});
-      p.socialConnected = p.socialConnected || {};
-      p.streaming = p.streaming || {};
-      p.socials = p.socials || {};
-      p.streamUrls = p.streamUrls || {};
-
-      if (provider === 'tiktok') {
-        p.socialConnected.tt = true;
-        if (profileUrl) p.socials.tt = profileUrl;
-      } else if (provider === 'twitter') {
-        p.socialConnected.tw = true;
-        if (profileUrl) p.socials.tw = profileUrl;
-      } else if (provider === 'spotify') {
-        p.streaming.spotify = true;
-        if (profileUrl) p.streamUrls.spotify = profileUrl;
-      } else if (provider === 'apple') {
-        p.streaming.apple = true;
-      }
-
-      if (typeof saveProfile === 'function') saveProfile(p);
-      else mbExtraSaveJson('mb_profile', p);
-
-      document.dispatchEvent(new CustomEvent('mb:profile-updated', { detail: p }));
-    } catch (error) {
-      console.warn('Could not update provider profile state:', error);
-    }
-  }
-
-  async function mbStartTikTokOauth() {
-    const data = await mbExtraGet('/api/tiktok/auth-url');
-    mbExtraSave('mb_pending_provider', 'tiktok');
-    mbExtraSave('mb_tiktok_oauth_state', data.state || '');
-    window.location.href = data.auth_url;
-  }
-
-  async function mbFinishTikTokOauth(code) {
-    const token = await mbExtraPost('/api/tiktok/exchange-code', { code });
-    if (!token.access_token) throw new Error('TikTok did not return an access token.');
-
-    mbExtraSave('mb_tiktok_access_token', token.access_token);
-    if (token.refresh_token) mbExtraSave('mb_tiktok_refresh_token', token.refresh_token);
-
-    const userBundle = await mbExtraPost('/api/tiktok/user', { access_token: token.access_token });
-    const videosBundle = await mbExtraPost('/api/tiktok/videos', {
-      access_token: token.access_token,
-      max_count: 10
-    }).catch((error) => ({ data: { videos: [] }, _error: error?.message || '' }));
-
-    const user = userBundle?.data?.user || {};
-    const videos = Array.isArray(videosBundle?.data?.videos) ? videosBundle.data.videos : [];
-
-    mbExtraSaveJson('mb_tiktok_profile', user);
-    mbExtraSaveJson('mb_tiktok_videos', videosBundle || {});
-
-    const videoViews = videos.reduce((sum, v) => sum + Number(v?.view_count || 0), 0);
-    const videoLikes = videos.reduce((sum, v) => sum + Number(v?.like_count || 0), 0);
-    const videoComments = videos.reduce((sum, v) => sum + Number(v?.comment_count || 0), 0);
-    const videoShares = videos.reduce((sum, v) => sum + Number(v?.share_count || 0), 0);
-
-    mbExtraPushWeeklyStats('tiktok', {
-      followers: Number(user.follower_count || 0),
-      posts: Number(user.video_count || videos.length || 0),
-      views: videoViews,
-      likes: Number(user.likes_count || videoLikes || 0),
-      comments: videoComments,
-      shares: videoShares,
-      niche: 'music / TikTok',
-      source: 'tiktok_api',
-      profileUrl: user.profile_deep_link || '',
-      profileLabel: user.username ? '@' + user.username : (user.display_name || 'TikTok')
-    });
-
-    mbExtraUpdateProfile('tiktok', user.profile_deep_link || '');
-    const btn = document.querySelector('#ai .providers .prov[data-p="tiktok"]');
-    if (btn) btn.classList.add('active');
-
-    mbExtraSave('mb_pending_provider', '');
-    mbExtraSave('mb_tiktok_oauth_state', '');
-    return { profile: user, videos };
-  }
-
-  async function mbAnalyzeTikTok() {
-    let accessToken = mbExtraLoad('mb_tiktok_access_token', '');
-    if (!accessToken) throw new Error('No TikTok account is connected. Connect TikTok first.');
-
-    async function fetchBundle(token) {
-      const userBundle = await mbExtraPost('/api/tiktok/user', { access_token: token });
-      const videosBundle = await mbExtraPost('/api/tiktok/videos', {
-        access_token: token,
-        max_count: 10
-      });
-      const user = userBundle?.data?.user || {};
-      const videos = Array.isArray(videosBundle?.data?.videos) ? videosBundle.data.videos : [];
-      mbExtraSaveJson('mb_tiktok_profile', user);
-      mbExtraSaveJson('mb_tiktok_videos', videosBundle || {});
-      return { profile: user, videos };
-    }
-
-    try {
-      return await fetchBundle(accessToken);
-    } catch (firstError) {
-      const refreshToken = mbExtraLoad('mb_tiktok_refresh_token', '');
-      if (!refreshToken) throw firstError;
-
-      const refreshed = await mbExtraPost('/api/tiktok/refresh-token', {
-        refresh_token: refreshToken
-      });
-      if (!refreshed.access_token) throw firstError;
-
-      accessToken = refreshed.access_token;
-      mbExtraSave('mb_tiktok_access_token', accessToken);
-      if (refreshed.refresh_token) mbExtraSave('mb_tiktok_refresh_token', refreshed.refresh_token);
-      return await fetchBundle(accessToken);
-    }
-  }
-
-  async function mbStartSpotifyOauth() {
-    const data = await mbExtraGet('/api/spotify/auth-url');
-    mbExtraSave('mb_pending_provider', 'spotify');
-    mbExtraSave('mb_spotify_oauth_state', data.state || '');
-    window.location.href = data.auth_url;
-  }
-
-  async function mbFinishSpotifyOauth(code) {
-    const token = await mbExtraPost('/api/spotify/exchange-code', { code });
-    if (!token.access_token) throw new Error('Spotify did not return an access token.');
-    mbExtraSave('mb_spotify_access_token', token.access_token);
-    if (token.refresh_token) mbExtraSave('mb_spotify_refresh_token', token.refresh_token);
-
-    const profile = await mbExtraPost('/api/spotify/me', { access_token: token.access_token });
-    mbExtraSaveJson('mb_spotify_profile', profile || {});
-    mbExtraPushWeeklyStats('spotify', {
-      followers: Number(profile?.followers?.total || 0),
-      posts: 0, views: 0, likes: 0, comments: 0, shares: 0,
-      niche: 'music / Spotify',
-      source: 'spotify_api',
-      profileUrl: profile?.external_urls?.spotify || '',
-      profileLabel: profile?.display_name || 'Spotify'
-    });
-    mbExtraUpdateProfile('spotify', profile?.external_urls?.spotify || '');
-    const btn = document.querySelector('#ai .providers .prov[data-p="spotify"]');
-    if (btn) btn.classList.add('active');
-    mbExtraSave('mb_pending_provider', '');
-    return profile;
-  }
-
-  async function mbAnalyzeSpotify() {
-    let accessToken = mbExtraLoad('mb_spotify_access_token', '');
-    if (!accessToken) throw new Error('No Spotify account is connected. Connect Spotify first.');
-    try {
-      const profile = await mbExtraPost('/api/spotify/me', { access_token: accessToken });
-      mbExtraSaveJson('mb_spotify_profile', profile || {});
-      return profile;
-    } catch (firstError) {
-      const refreshToken = mbExtraLoad('mb_spotify_refresh_token', '');
-      if (!refreshToken) throw firstError;
-      const refreshed = await mbExtraPost('/api/spotify/refresh-token', { refresh_token: refreshToken });
-      if (!refreshed.access_token) throw firstError;
-      accessToken = refreshed.access_token;
-      mbExtraSave('mb_spotify_access_token', accessToken);
-      const profile = await mbExtraPost('/api/spotify/me', { access_token: accessToken });
-      mbExtraSaveJson('mb_spotify_profile', profile || {});
-      return profile;
-    }
-  }
-
-  async function mbStartXOauth() {
-    const data = await mbExtraGet('/api/x/auth-url');
-    mbExtraSave('mb_pending_provider', 'twitter');
-    mbExtraSave('mb_x_oauth_state', data.state || '');
-    mbExtraSave('mb_x_code_verifier', data.code_verifier || '');
-    window.location.href = data.auth_url;
-  }
-
-  async function mbFinishXOauth(code) {
-    const codeVerifier = mbExtraLoad('mb_x_code_verifier', '');
-    const token = await mbExtraPost('/api/x/exchange-code', { code, code_verifier: codeVerifier });
-    if (!token.access_token) throw new Error('X did not return an access token.');
-    mbExtraSave('mb_x_access_token', token.access_token);
-    if (token.refresh_token) mbExtraSave('mb_x_refresh_token', token.refresh_token);
-
-    const bundle = await mbExtraPost('/api/x/me', { access_token: token.access_token });
-    const profile = bundle?.data || {};
-    mbExtraSaveJson('mb_x_profile', profile);
-
-    mbExtraPushWeeklyStats('twitter', {
-      followers: Number(profile?.public_metrics?.followers_count || 0),
-      posts: Number(profile?.public_metrics?.tweet_count || 0),
-      views: 0, likes: 0, comments: 0, shares: 0,
-      niche: 'music / X',
-      source: 'x_api',
-      profileUrl: profile?.username ? 'https://x.com/' + profile.username : '',
-      profileLabel: profile?.username ? '@' + profile.username : (profile?.name || 'X')
-    });
-
-    mbExtraUpdateProfile('twitter', profile?.username ? 'https://x.com/' + profile.username : '');
-    const btn = document.querySelector('#ai .providers .prov[data-p="twitter"]');
-    if (btn) btn.classList.add('active');
-    mbExtraSave('mb_pending_provider', '');
-    mbExtraSave('mb_x_code_verifier', '');
-    return profile;
-  }
-
-  async function mbAnalyzeX() {
-    const accessToken = mbExtraLoad('mb_x_access_token', '');
-    if (!accessToken) throw new Error('No X account is connected. Connect X first.');
-    const bundle = await mbExtraPost('/api/x/me', { access_token: accessToken });
-    const profile = bundle?.data || {};
-    mbExtraSaveJson('mb_x_profile', profile);
-    return profile;
-  }
-
-  async function mbStartAppleMusic() {
-    const data = await mbExtraGet('/api/apple/developer-token');
-    if (!data.developer_token) throw new Error('Apple Music is not configured yet.');
-    mbExtraSave('mb_apple_developer_token', data.developer_token);
-    alert('Apple Music server setup is ready. The Apple Developer MusicKit configuration is still required before user sign-in can be enabled.');
-  }
-
-  window.mbStartTikTokOauth = mbStartTikTokOauth;
-  window.mbFinishTikTokOauth = mbFinishTikTokOauth;
-  window.mbAnalyzeTikTok = mbAnalyzeTikTok;
-  window.mbStartSpotifyOauth = mbStartSpotifyOauth;
-  window.mbFinishSpotifyOauth = mbFinishSpotifyOauth;
-  window.mbAnalyzeSpotify = mbAnalyzeSpotify;
-  window.mbStartXOauth = mbStartXOauth;
-  window.mbFinishXOauth = mbFinishXOauth;
-  window.mbAnalyzeX = mbAnalyzeX;
-  window.mbStartAppleMusic = mbStartAppleMusic;
-
-  ;(async function mbHandleExpandedProviderCallback() {
-    const params = new URLSearchParams(window.location.search || '');
-    const code = params.get('code');
-    if (!code) return;
-
-    const pending = mbExtraLoad('mb_pending_provider', '');
-    if (!['tiktok', 'spotify', 'twitter'].includes(pending)) return;
-
-    try {
-      if (pending === 'tiktok') await mbFinishTikTokOauth(code);
-      if (pending === 'spotify') await mbFinishSpotifyOauth(code);
-      if (pending === 'twitter') await mbFinishXOauth(code);
-
-      ['code','state','scope','error','error_description','authuser','prompt'].forEach((key) => params.delete(key));
-      const clean = window.location.pathname +
-        (params.toString() ? '?' + params.toString() : '') +
-        window.location.hash;
-      window.history.replaceState({}, document.title, clean);
-    } catch (error) {
-      console.error(pending + ' OAuth callback failed:', error);
-      alert((pending === 'twitter' ? 'X' : pending) + ' connection failed: ' + (error?.message || 'Unknown error'));
-    }
-  })();
-
-
   /* =========================
      PROVIDER CLICK HANDLER
   ========================== */
@@ -5333,46 +5010,13 @@ const MB_API_ENDPOINTS = {
       return;
     }
 
-    if (providerKey === 'tiktok') {
+    if (providerKey === 'facebook') {
       btn.classList.add('active');
-      if (typeof window.mbStartTikTokOauth === 'function') {
-        window.mbStartTikTokOauth().catch((error) => {
-          console.error('TikTok OAuth start failed:', error);
-          alert(error?.message || 'Could not start TikTok login.');
-        });
-      }
-      return;
-    }
-
-    if (providerKey === 'spotify') {
-      btn.classList.add('active');
-      if (typeof window.mbStartSpotifyOauth === 'function') {
-        window.mbStartSpotifyOauth().catch((error) => {
-          console.error('Spotify OAuth start failed:', error);
-          alert(error?.message || 'Spotify is not configured yet.');
-        });
-      }
-      return;
-    }
-
-    if (providerKey === 'twitter' || providerKey === 'x' || providerKey === 'x / twitter') {
-      btn.classList.add('active');
-      if (typeof window.mbStartXOauth === 'function') {
-        window.mbStartXOauth().catch((error) => {
-          console.error('X OAuth start failed:', error);
-          alert(error?.message || 'X is not configured yet.');
-        });
-      }
-      return;
-    }
-
-    if (providerKey === 'apple' || providerKey === 'apple music') {
-      btn.classList.add('active');
-      if (typeof window.mbStartAppleMusic === 'function') {
-        window.mbStartAppleMusic().catch((error) => {
-          console.error('Apple Music setup failed:', error);
-          alert(error?.message || 'Apple Music is not configured yet.');
-        });
+      try { localStorage.setItem('mb_pending_provider', 'facebook'); } catch (e) {}
+      if (typeof window.mbStartFacebookOauth === 'function') {
+        window.mbStartFacebookOauth();
+      } else {
+        alert('Facebook Login is still loading. Refresh the page and try again.');
       }
       return;
     }
@@ -9846,6 +9490,36 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     window.location.href = instagramOauthUrl();
   };
 
+  /* =========================
+     FACEBOOK LOGIN TEST
+     Phase 1 only: prove Facebook OAuth opens and returns to MusixBlvd.
+     Token exchange / Graph API data will be wired in the backend next.
+  ========================== */
+  var FACEBOOK_APP_ID = INSTAGRAM_APP_ID;
+
+  function getFacebookRedirectUri(){
+    var isLocal = /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname || '');
+    return isLocal ? (window.location.origin + (window.location.pathname || '/dashboard.html')) : 'https://musixblvd.com/dashboard.html';
+  }
+
+  function facebookOauthUrl(){
+    var state = 'mbfb_' + Date.now();
+    save('mb_pending_provider', 'facebook');
+    save('mb_facebook_oauth_state', state);
+    var params = new URLSearchParams({
+      client_id: FACEBOOK_APP_ID,
+      redirect_uri: getFacebookRedirectUri(),
+      response_type: 'code',
+      state: state
+    });
+    return 'https://www.facebook.com/dialog/oauth?' + params.toString();
+  }
+
+  window.mbStartFacebookOauth = function(){
+    setStatus('mbFacebookStatus', 'Opening Facebook login...', true);
+    window.location.href = facebookOauthUrl();
+  };
+
   async function fetchInstagramBundle(accessToken){
     var profile = await postJson('/api/instagram/profile', { access_token: accessToken });
     var media = null, insights = null;
@@ -10043,70 +9717,6 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     );
   }
 
-
-  function renderExpandedProviderCard(provider){
-    var title = provider;
-    var subtitle = 'Connected';
-    var pills = [];
-
-    if (provider === 'TikTok') {
-      var tt = loadJson('mb_tiktok_profile', {}) || {};
-      var ttv = loadJson('mb_tiktok_videos', {}) || {};
-      var videos = Array.isArray(ttv && ttv.data && ttv.data.videos) ? ttv.data.videos : [];
-      var views = 0, comments = 0, shares = 0;
-      videos.forEach(function(v){
-        views += Number(v && v.view_count || 0);
-        comments += Number(v && v.comment_count || 0);
-        shares += Number(v && v.share_count || 0);
-      });
-      subtitle = tt.username ? '@' + tt.username : (tt.display_name || 'Connected TikTok');
-      pills = [
-        ['Followers', tt.follower_count || 0],
-        ['Following', tt.following_count || 0],
-        ['Likes', tt.likes_count || 0],
-        ['Videos', tt.video_count || videos.length || 0],
-        ['Recent views', views],
-        ['Recent comments', comments],
-        ['Recent shares', shares]
-      ];
-    }
-
-    if (provider === 'Spotify') {
-      var sp = loadJson('mb_spotify_profile', {}) || {};
-      subtitle = sp.display_name || 'Connected Spotify';
-      pills = [
-        ['Followers', sp.followers && sp.followers.total || 0],
-        ['Country', sp.country || '—'],
-        ['Product', sp.product || '—']
-      ];
-    }
-
-    if (provider === 'X / Twitter') {
-      var xp = loadJson('mb_x_profile', {}) || {};
-      var pm = xp.public_metrics || {};
-      subtitle = xp.username ? '@' + xp.username : (xp.name || 'Connected X');
-      pills = [
-        ['Followers', pm.followers_count || 0],
-        ['Following', pm.following_count || 0],
-        ['Posts', pm.tweet_count || 0],
-        ['Listed', pm.listed_count || 0]
-      ];
-    }
-
-    upsertPlatformCard(
-      'platformCard' + provider.replace(/[^A-Za-z0-9]/g,''),
-      '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">' +
-        '<div><div style="font-weight:900;font-size:17px">' + esc(title) + '</div><div class="tiny muted">' + esc(subtitle) + '</div></div>' +
-        '<span class="tag">API</span>' +
-      '</div>' +
-      '<div class="weekly-platform-stats" style="margin-top:12px">' +
-        pills.map(function(pair){
-          return '<span class="weekly-stat-pill">' + esc(pair[0]) + ': <strong>' + fmt(pair[1]) + '</strong></span>';
-        }).join('') +
-      '</div>'
-    );
-  }
-
   async function analyzeYouTube(){
     var token = load('mb_youtube_access_token','');
     if (token) {
@@ -10150,19 +9760,6 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
         var ytc = loadJson('mb_youtube_channel', {}) || {};
         var yts = ytc.statistics || {};
         html.push('<li><strong>YouTube:</strong> ' + esc(ytc && ytc.snippet && ytc.snippet.title || 'Connected') + ' • Subscribers: ' + fmt(yts.subscriberCount || 0) + ' • Views: ' + fmt(yts.viewCount || 0) + '</li>');
-      }
-      if (ran.indexOf('TikTok') >= 0) {
-        var tt = loadJson('mb_tiktok_profile', {}) || {};
-        html.push('<li><strong>TikTok:</strong> ' + esc(tt.username ? '@' + tt.username : (tt.display_name || 'Connected')) + ' • Followers: ' + fmt(tt.follower_count || 0) + ' • Likes: ' + fmt(tt.likes_count || 0) + '</li>');
-      }
-      if (ran.indexOf('Spotify') >= 0) {
-        var sp = loadJson('mb_spotify_profile', {}) || {};
-        html.push('<li><strong>Spotify:</strong> ' + esc(sp.display_name || 'Connected') + ' • Followers: ' + fmt(sp.followers && sp.followers.total || 0) + '</li>');
-      }
-      if (ran.indexOf('X / Twitter') >= 0) {
-        var xp = loadJson('mb_x_profile', {}) || {};
-        var xpm = xp.public_metrics || {};
-        html.push('<li><strong>X:</strong> ' + esc(xp.username ? '@' + xp.username : (xp.name || 'Connected')) + ' • Followers: ' + fmt(xpm.followers_count || 0) + ' • Posts: ' + fmt(xpm.tweet_count || 0) + '</li>');
       }
       signals.innerHTML = html.join('') || '<li>No platform stats loaded yet.</li>';
     }
@@ -10212,11 +9809,30 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     var state = params.get('state') || '';
     var pending = load('mb_pending_provider','');
     var scState = load('mb_soundcloud_oauth_state','');
+    var fbState = load('mb_facebook_oauth_state','');
     var isSoundCloud = pending === 'soundcloud' || (state && scState && state === scState);
     var isInstagram = pending === 'instagram' || /^mbig_/.test(state);
+    var isFacebook = pending === 'facebook' || /^mbfb_/.test(state) || (state && fbState && state === fbState);
 
     if (isSoundCloud) {
       // Let the working SoundCloud callback handle this. It already runs in the SoundCloud module.
+      return;
+    }
+
+    if (isFacebook) {
+      if (fbState && state && fbState !== state) {
+        setStatus('mbFacebookStatus', 'Facebook returned, but the security state did not match. Start Facebook login again.', false);
+      } else {
+        save('mb_facebook_oauth_code', code);
+        save('mb_facebook_login_test', 'returned');
+        var fbBtn = qs('#ai .providers .prov[data-p="facebook"]');
+        if (fbBtn) fbBtn.classList.add('active');
+        setStatus('mbFacebookStatus', '<strong>Facebook login returned successfully.</strong> Login test passed. Token exchange + Facebook Graph API connection is the next step.', true);
+      }
+      try { localStorage.removeItem('mb_pending_provider'); localStorage.removeItem('mb_facebook_oauth_state'); } catch(e){}
+      params.delete('code'); params.delete('state'); params.delete('error'); params.delete('error_description'); params.delete('error_reason');
+      var fbClean = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
+      window.history.replaceState({}, document.title, fbClean);
       return;
     }
 
@@ -10249,11 +9865,8 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
         var shouldRunInstagram = selected.indexOf('instagram') >= 0 || (selected.length === 0 && instagramHasData());
         var shouldRunSoundCloud = selected.indexOf('soundcloud') >= 0 || (selected.length === 0 && soundcloudHasData());
         var shouldRunYouTube = selected.indexOf('youtube') >= 0 || (selected.length === 0 && youtubeHasData());
-        var shouldRunTikTok = selected.indexOf('tiktok') >= 0 && !!localStorage.getItem('mb_tiktok_access_token');
-        var shouldRunSpotify = selected.indexOf('spotify') >= 0 && !!localStorage.getItem('mb_spotify_access_token');
-        var shouldRunX = selected.indexOf('twitter') >= 0 && !!localStorage.getItem('mb_x_access_token');
 
-        if (!shouldRunInstagram && !shouldRunSoundCloud && !shouldRunYouTube && !shouldRunTikTok && !shouldRunSpotify && !shouldRunX) return;
+        if (!shouldRunInstagram && !shouldRunSoundCloud && !shouldRunYouTube) return;
 
         e.preventDefault();
         e.stopPropagation();
@@ -10262,80 +9875,32 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
         showScan(true);
         (async function(){
           var ran = [];
-          var failed = [];
           var scOut = null;
-
-          async function runProvider(label, fn){
-            try {
-              await fn();
-              ran.push(label);
-            } catch(err) {
-              console.error(label + ' analyze failed:', err);
-              failed.push(label + ': ' + (err && err.message ? err.message : 'Unknown error'));
-            }
-          }
-
           if (shouldRunSoundCloud) {
-            await runProvider('SoundCloud', async function(){
-              if (typeof window.mbAnalyzeSoundCloudOnly !== 'function') throw new Error('SoundCloud analyzer is not loaded.');
-              scOut = await window.mbAnalyzeSoundCloudOnly();
-              renderSoundCloudCardFromSaved(scOut || {});
-            });
+            if (typeof window.mbAnalyzeSoundCloudOnly !== 'function') throw new Error('SoundCloud analyzer is not loaded.');
+            scOut = await window.mbAnalyzeSoundCloudOnly();
+            renderSoundCloudCardFromSaved(scOut || {});
+            ran.push('SoundCloud');
           }
-
           if (shouldRunYouTube) {
-            await runProvider('YouTube', async function(){
-              await analyzeYouTube();
-            });
+            await analyzeYouTube();
+            ran.push('YouTube');
           }
-
           if (shouldRunInstagram) {
-            await runProvider('Instagram', async function(){
-              await analyzeInstagram();
-            });
+            await analyzeInstagram();
+            ran.push('Instagram');
           }
-
-          if (shouldRunTikTok) {
-            await runProvider('TikTok', async function(){
-              if (typeof window.mbAnalyzeTikTok !== 'function') throw new Error('TikTok analyzer is not loaded.');
-              await window.mbAnalyzeTikTok();
-              renderExpandedProviderCard('TikTok');
-            });
-          }
-
-          if (shouldRunSpotify) {
-            await runProvider('Spotify', async function(){
-              if (typeof window.mbAnalyzeSpotify !== 'function') throw new Error('Spotify analyzer is not loaded.');
-              await window.mbAnalyzeSpotify();
-              renderExpandedProviderCard('Spotify');
-            });
-          }
-
-          if (shouldRunX) {
-            await runProvider('X / Twitter', async function(){
-              if (typeof window.mbAnalyzeX !== 'function') throw new Error('X analyzer is not loaded.');
-              await window.mbAnalyzeX();
-              renderExpandedProviderCard('X / Twitter');
-            });
-          }
-
+          // Final pass writes a shared summary only. The cards keep each platform's stats separate.
           if (ran.indexOf('SoundCloud') >= 0 && !qs('#platformCardSoundCloud')) renderSoundCloudCardFromSaved(scOut || {});
           if (ran.indexOf('Instagram') >= 0 && !qs('#platformCardInstagram')) renderInstagramCard();
           if (ran.indexOf('YouTube') >= 0 && !qs('#platformCardYouTube')) renderYouTubeCardFromSaved();
-
           renderUnifiedResults(ran);
-
-          if (failed.length) {
-            setStatus(
-              'mbUnifiedAnalyzeStatus',
-              (ran.length ? 'Analyzed: <strong>' + esc(ran.join(' + ')) + '</strong>. ' : '') +
-              'Needs attention: ' + esc(failed.join(' | ')),
-              ran.length > 0
-            );
-          } else {
-            setStatus('mbUnifiedAnalyzeStatus', 'Analyzed: <strong>' + esc(ran.join(' + ')) + '</strong>.', true);
-          }
-        })().finally(function(){
+          setStatus('mbUnifiedAnalyzeStatus', 'Analyzed: <strong>' + esc(ran.join(' + ')) + '</strong>.', true);
+        })().catch(function(err){
+          console.error('Unified Analyze failed:', err);
+          setStatus('mbUnifiedAnalyzeStatus', 'Analyze failed: ' + esc(err && err.message ? err.message : 'Unknown error'), false);
+          alert('Analyze failed: ' + (err && err.message ? err.message : 'Unknown error'));
+        }).finally(function(){
           showScan(false);
         });
       }, true);
