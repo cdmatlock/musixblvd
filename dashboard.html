@@ -4959,6 +4959,253 @@ const MB_API_ENDPOINTS = {
     }
   })();
 
+
+  /* =========================
+     EXPANDED PROVIDER OAUTH CONNECT
+     TikTok / Spotify / X / Facebook / Apple Music
+     - These providers do NOT use the old manual username popup.
+     - Each provider is isolated so one failed login does not affect the others.
+  ========================== */
+  const MB_PROVIDER_BACKEND = 'https://musixblvd.onrender.com';
+
+  function mbShowProviderStatus(provider, message, ok = true) {
+    const id = 'mb' + String(provider || '').replace(/[^a-z0-9]/gi, '') + 'Status';
+    let status = document.getElementById(id);
+    const startBtn = document.getElementById('startAnalysis');
+    if (!status) {
+      status = document.createElement('p');
+      status.id = id;
+      status.className = 'tiny muted';
+      status.style.margin = '10px 0 0';
+      if (startBtn && startBtn.parentElement) startBtn.parentElement.insertAdjacentElement('afterend', status);
+    }
+    status.textContent = message || '';
+    status.style.color = ok ? '#64748b' : '#b91c1c';
+  }
+
+  async function mbGetAuthUrl(provider) {
+    const resp = await fetch(`${MB_PROVIDER_BACKEND}/api/${provider}/auth-url`, { headers: { 'Accept':'application/json' } });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.auth_url) throw new Error(data.error || `Could not start ${provider} login.`);
+    return data;
+  }
+
+  async function mbStartTikTokOauth() {
+    mbShowProviderStatus('TikTok', 'Opening TikTok login...', true);
+    const data = await mbGetAuthUrl('tiktok');
+    localStorage.setItem('mb_pending_provider', 'tiktok');
+    localStorage.setItem('mb_tiktok_oauth_state', data.state || '');
+    window.location.href = data.auth_url;
+  }
+
+  async function mbFinishTikTokOauth(code) {
+    mbShowProviderStatus('TikTok', 'Finishing TikTok connection...', true);
+    const resp = await fetch(`${MB_PROVIDER_BACKEND}/api/tiktok/exchange-code`, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({code})
+    });
+    const token = await resp.json().catch(() => ({}));
+    if (!resp.ok || !token.access_token) throw new Error(token.error_description || token.error || 'TikTok token exchange failed.');
+    localStorage.setItem('mb_tiktok_access_token', token.access_token);
+    if (token.refresh_token) localStorage.setItem('mb_tiktok_refresh_token', token.refresh_token);
+
+    let profile = {}, videos = {};
+    try {
+      const r = await fetch(`${MB_PROVIDER_BACKEND}/api/tiktok/user`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({access_token:token.access_token})});
+      profile = await r.json().catch(() => ({}));
+      localStorage.setItem('mb_tiktok_profile', JSON.stringify(profile));
+    } catch(e) { console.warn('TikTok profile fetch failed', e); }
+    try {
+      const r = await fetch(`${MB_PROVIDER_BACKEND}/api/tiktok/videos`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({access_token:token.access_token,max_count:10})});
+      videos = await r.json().catch(() => ({}));
+      localStorage.setItem('mb_tiktok_videos', JSON.stringify(videos));
+    } catch(e) { console.warn('TikTok videos fetch failed', e); }
+
+    const btn = document.querySelector('#ai .providers .prov[data-p="tiktok"]');
+    if (btn) btn.classList.add('active');
+    try {
+      const p = normalizeProfile(loadProfile());
+      p.socialConnected.tiktok = true;
+      const u = profile?.data?.user?.username || profile?.data?.user?.display_name || '';
+      if (u) p.socials.tiktok = u.startsWith('@') ? u : '@' + u;
+      saveProfile(p);
+      document.dispatchEvent(new CustomEvent('mb:profile-updated', {detail:p}));
+    } catch(e) {}
+    mbShowProviderStatus('TikTok', 'TikTok connected.', true);
+  }
+
+  async function mbStartSpotifyOauth() {
+    mbShowProviderStatus('Spotify', 'Opening Spotify login...', true);
+    const data = await mbGetAuthUrl('spotify');
+    localStorage.setItem('mb_pending_provider', 'spotify');
+    localStorage.setItem('mb_spotify_oauth_state', data.state || '');
+    window.location.href = data.auth_url;
+  }
+
+  async function mbFinishSpotifyOauth(code) {
+    mbShowProviderStatus('Spotify', 'Finishing Spotify connection...', true);
+    const resp = await fetch(`${MB_PROVIDER_BACKEND}/api/spotify/exchange-code`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});
+    const token = await resp.json().catch(() => ({}));
+    if (!resp.ok || !token.access_token) throw new Error(token.error_description || token.error || 'Spotify token exchange failed.');
+    localStorage.setItem('mb_spotify_access_token', token.access_token);
+    if (token.refresh_token) localStorage.setItem('mb_spotify_refresh_token', token.refresh_token);
+    const meResp = await fetch(`${MB_PROVIDER_BACKEND}/api/spotify/me`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({access_token:token.access_token})});
+    const me = await meResp.json().catch(() => ({}));
+    if (meResp.ok) localStorage.setItem('mb_spotify_profile', JSON.stringify(me));
+    const btn = document.querySelector('#ai .providers .prov[data-p="spotify"]');
+    if (btn) btn.classList.add('active');
+    try {
+      const p = normalizeProfile(loadProfile());
+      p.streaming.spotify = true;
+      if (me?.external_urls?.spotify) p.streamUrls.spotify = me.external_urls.spotify;
+      saveProfile(p);
+      document.dispatchEvent(new CustomEvent('mb:profile-updated', {detail:p}));
+    } catch(e) {}
+    mbShowProviderStatus('Spotify', `Spotify connected${me?.display_name ? ': ' + me.display_name : ''}.`, true);
+  }
+
+  async function mbStartXOauth() {
+    mbShowProviderStatus('X', 'Opening X login...', true);
+    const data = await mbGetAuthUrl('x');
+    localStorage.setItem('mb_pending_provider', 'x');
+    localStorage.setItem('mb_x_oauth_state', data.state || '');
+    localStorage.setItem('mb_x_code_verifier', data.code_verifier || '');
+    window.location.href = data.auth_url;
+  }
+
+  async function mbFinishXOauth(code) {
+    const verifier = localStorage.getItem('mb_x_code_verifier') || '';
+    if (!verifier) throw new Error('X code verifier is missing. Start X connect again.');
+    mbShowProviderStatus('X', 'Finishing X connection...', true);
+    const resp = await fetch(`${MB_PROVIDER_BACKEND}/api/x/exchange-code`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,code_verifier:verifier})});
+    const token = await resp.json().catch(() => ({}));
+    if (!resp.ok || !token.access_token) throw new Error(token.error_description || token.error || 'X token exchange failed.');
+    localStorage.setItem('mb_x_access_token', token.access_token);
+    if (token.refresh_token) localStorage.setItem('mb_x_refresh_token', token.refresh_token);
+    const meResp = await fetch(`${MB_PROVIDER_BACKEND}/api/x/me`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({access_token:token.access_token})});
+    const me = await meResp.json().catch(() => ({}));
+    if (meResp.ok) localStorage.setItem('mb_x_profile', JSON.stringify(me));
+    const btn = document.querySelector('#ai .providers .prov[data-p="twitter"]');
+    if (btn) btn.classList.add('active');
+    try {
+      const p = normalizeProfile(loadProfile());
+      p.socialConnected.twitter = true;
+      const username = me?.data?.username || '';
+      if (username) p.socials.twitter = '@' + username;
+      saveProfile(p);
+      document.dispatchEvent(new CustomEvent('mb:profile-updated', {detail:p}));
+    } catch(e) {}
+    mbShowProviderStatus('X', `X connected${me?.data?.username ? ': @' + me.data.username : ''}.`, true);
+  }
+
+  async function mbStartFacebookOauth() {
+    mbShowProviderStatus('Facebook', 'Opening Facebook login...', true);
+    const data = await mbGetAuthUrl('facebook');
+    localStorage.setItem('mb_pending_provider', 'facebook');
+    localStorage.setItem('mb_facebook_oauth_state', data.state || '');
+    window.location.href = data.auth_url;
+  }
+
+  async function mbFinishFacebookOauth(code) {
+    mbShowProviderStatus('Facebook', 'Finishing Facebook connection...', true);
+    const resp = await fetch(`${MB_PROVIDER_BACKEND}/api/facebook/exchange-code`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});
+    const token = await resp.json().catch(() => ({}));
+    if (!resp.ok || !token.access_token) throw new Error(token.error_description || token.error?.message || token.error || 'Facebook token exchange failed.');
+    localStorage.setItem('mb_facebook_access_token', token.access_token);
+    const meResp = await fetch(`${MB_PROVIDER_BACKEND}/api/facebook/me`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({access_token:token.access_token})});
+    const me = await meResp.json().catch(() => ({}));
+    if (meResp.ok) localStorage.setItem('mb_facebook_profile', JSON.stringify(me));
+    const btn = document.querySelector('#ai .providers .prov[data-p="facebook"]');
+    if (btn) btn.classList.add('active');
+    try {
+      const p = normalizeProfile(loadProfile());
+      p.socialConnected.facebook = true;
+      saveProfile(p);
+      document.dispatchEvent(new CustomEvent('mb:profile-updated', {detail:p}));
+    } catch(e) {}
+    mbShowProviderStatus('Facebook', `Facebook connected${me?.name ? ': ' + me.name : ''}.`, true);
+  }
+
+  function mbLoadMusicKitScript() {
+    return new Promise((resolve, reject) => {
+      if (window.MusicKit) return resolve();
+      const existing = document.querySelector('script[data-mb-musickit]');
+      if (existing) { existing.addEventListener('load', resolve, {once:true}); existing.addEventListener('error', reject, {once:true}); return; }
+      const s = document.createElement('script');
+      s.src = 'https://js-cdn.music.apple.com/musickit/v3/musickit.js';
+      s.async = true;
+      s.dataset.mbMusickit = '1';
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('Could not load Apple MusicKit.'));
+      document.head.appendChild(s);
+    });
+  }
+
+  async function mbStartAppleMusicOauth() {
+    mbShowProviderStatus('AppleMusic', 'Opening Apple Music authorization...', true);
+    const tokenResp = await fetch(`${MB_PROVIDER_BACKEND}/api/apple/developer-token`, {headers:{'Accept':'application/json'}});
+    const tokenData = await tokenResp.json().catch(() => ({}));
+    if (!tokenResp.ok || !tokenData.developer_token) throw new Error(tokenData.error || 'Apple Music is not configured on the backend yet.');
+    await mbLoadMusicKitScript();
+    await MusicKit.configure({
+      developerToken: tokenData.developer_token,
+      app: { name:'MusixBlvd', build:'1.0.0' }
+    });
+    const music = MusicKit.getInstance();
+    const userToken = await music.authorize();
+    if (!userToken) throw new Error('Apple Music authorization was not completed.');
+    localStorage.setItem('mb_apple_music_user_token', userToken);
+    const btn = document.querySelector('#ai .providers .prov[data-p="apple music"]');
+    if (btn) btn.classList.add('active');
+    try {
+      const p = normalizeProfile(loadProfile());
+      p.streaming.apple = true;
+      saveProfile(p);
+      document.dispatchEvent(new CustomEvent('mb:profile-updated', {detail:p}));
+    } catch(e) {}
+    mbShowProviderStatus('AppleMusic', 'Apple Music connected.', true);
+  }
+
+  window.mbStartTikTokOauth = mbStartTikTokOauth;
+  window.mbStartSpotifyOauth = mbStartSpotifyOauth;
+  window.mbStartXOauth = mbStartXOauth;
+  window.mbStartFacebookOauth = mbStartFacebookOauth;
+  window.mbStartAppleMusicOauth = mbStartAppleMusicOauth;
+
+  ;(async function mbHandleExpandedProviderCallback(){
+    const params = new URLSearchParams(window.location.search || '');
+    const code = params.get('code');
+    const error = params.get('error');
+    const errorDescription = params.get('error_description') || params.get('error_reason') || '';
+    const pending = localStorage.getItem('mb_pending_provider') || '';
+    if (!pending || !['tiktok','spotify','x','facebook'].includes(pending)) return;
+
+    if (error) {
+      mbShowProviderStatus(pending, `${pending} login was not completed${errorDescription ? ': ' + errorDescription : ''}.`, false);
+    } else if (code) {
+      try {
+        if (pending === 'tiktok') await mbFinishTikTokOauth(code);
+        if (pending === 'spotify') await mbFinishSpotifyOauth(code);
+        if (pending === 'x') await mbFinishXOauth(code);
+        if (pending === 'facebook') await mbFinishFacebookOauth(code);
+      } catch (e) {
+        console.error(`${pending} OAuth finish failed`, e);
+        mbShowProviderStatus(pending, e?.message || `${pending} connection failed.`, false);
+      }
+    }
+
+    try {
+      localStorage.removeItem('mb_pending_provider');
+      if (pending === 'tiktok') localStorage.removeItem('mb_tiktok_oauth_state');
+      if (pending === 'spotify') localStorage.removeItem('mb_spotify_oauth_state');
+      if (pending === 'x') { localStorage.removeItem('mb_x_oauth_state'); localStorage.removeItem('mb_x_code_verifier'); }
+      if (pending === 'facebook') localStorage.removeItem('mb_facebook_oauth_state');
+    } catch(e) {}
+
+    ['code','state','scope','error','error_reason','error_description','authuser','prompt'].forEach(k => params.delete(k));
+    const clean = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
+    window.history.replaceState({}, document.title, clean);
+  })();
+
   /* =========================
      PROVIDER CLICK HANDLER
   ========================== */
@@ -5005,11 +5252,37 @@ const MB_API_ENDPOINTS = {
       if (typeof window.mbStartInstagramOauth === 'function') {
         window.mbStartInstagramOauth();
       } else {
-        openConnect(providerKeyRaw);
+        alert('Instagram login is not ready on this page.');
       }
       return;
     }
 
+    if (providerKey === 'tiktok') {
+      mbStartTikTokOauth().catch((error) => { console.error(error); mbShowProviderStatus('TikTok', error?.message || 'Could not start TikTok login.', false); });
+      return;
+    }
+
+    if (providerKey === 'spotify') {
+      mbStartSpotifyOauth().catch((error) => { console.error(error); mbShowProviderStatus('Spotify', error?.message || 'Could not start Spotify login.', false); });
+      return;
+    }
+
+    if (providerKey === 'twitter' || providerKey === 'x' || providerKey === 'x / twitter') {
+      mbStartXOauth().catch((error) => { console.error(error); mbShowProviderStatus('X', error?.message || 'Could not start X login.', false); });
+      return;
+    }
+
+    if (providerKey === 'facebook') {
+      mbStartFacebookOauth().catch((error) => { console.error(error); mbShowProviderStatus('Facebook', error?.message || 'Could not start Facebook login.', false); });
+      return;
+    }
+
+    if (providerKey === 'apple music' || providerKey === 'apple') {
+      mbStartAppleMusicOauth().catch((error) => { console.error(error); mbShowProviderStatus('AppleMusic', error?.message || 'Could not start Apple Music authorization.', false); });
+      return;
+    }
+
+    // Any provider not explicitly supported here keeps the legacy manual connector.
     openConnect(providerKeyRaw);
   }, true);
 
