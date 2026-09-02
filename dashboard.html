@@ -4087,6 +4087,28 @@ const MB_API_ENDPOINTS = {
       await enhanceMikeyResultsWithAI();
     }, 1100);
   });
+
+  // Weekly Plan: Regenerate button
+  // Rebuild the current results from saved stats, then ask MIKEY for a fresh AI plan.
+  $('#regen')?.addEventListener('click', async (e) => {
+    e.preventDefault();
+
+    const btn = e.currentTarget;
+    const oldText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Regenerating…';
+    talk(true);
+
+    try {
+      showResults();
+      window.mbRenderSavedInstagramResults?.();
+      await enhanceMikeyResultsWithAI();
+    } finally {
+      talk(false);
+      btn.disabled = false;
+      btn.textContent = oldText || 'Regenerate';
+    }
+  });
 })();
 
 
