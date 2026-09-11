@@ -36,13 +36,22 @@ const YOUTUBE_API_BASE_URL = 'https://www.googleapis.com/youtube/v3';
 const YOUTUBE_SCOPE = 'https://www.googleapis.com/auth/youtube.readonly';
 
 // ---------------- Additional provider configuration ----------------
-const TIKTOK_CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY || 'awzrpugp2i4c48x0';
-const TIKTOK_CLIENT_SECRET = process.env.TIKTOK_CLIENT_SECRET || 'xskxj3O5VLKMVgYCT0JgTdaNbgVrkZaV';
-const TIKTOK_REDIRECT_URI = process.env.TIKTOK_REDIRECT_URI || 'https://musixblvd.com/dashboard.html';
+const TIKTOK_CLIENT_KEY = (process.env.TIKTOK_CLIENT_KEY || 'awzrpugp2i4c48x0').trim();
+
+const TIKTOK_CLIENT_SECRET = (process.env.TIKTOK_CLIENT_SECRET || '').trim();
+
+const TIKTOK_REDIRECT_URI = (
+  process.env.TIKTOK_REDIRECT_URI ||
+  'https://musixblvd.com/dashboard.html'
+).trim();
+
 const TIKTOK_AUTH_URL = 'https://www.tiktok.com/v2/auth/authorize/';
 const TIKTOK_TOKEN_URL = 'https://open.tiktokapis.com/v2/oauth/token/';
 const TIKTOK_API_BASE_URL = 'https://open.tiktokapis.com/v2';
-const TIKTOK_SCOPE = 'user.info.basic,user.info.profile,user.info.stats,video.list';
+
+const TIKTOK_SCOPE =
+  'user.info.basic,user.info.profile,user.info.stats,video.list';
+
 
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || '';
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || '';
