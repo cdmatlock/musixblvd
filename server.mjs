@@ -36,9 +36,9 @@ const YOUTUBE_API_BASE_URL = 'https://www.googleapis.com/youtube/v3';
 const YOUTUBE_SCOPE = 'https://www.googleapis.com/auth/youtube.readonly';
 
 // ---------------- Additional provider configuration ----------------
-const TIKTOK_CLIENT_KEY = (process.env.TIKTOK_CLIENT_KEY || 'awzrpugp2i4c48x0').trim();
+const TIKTOK_CLIENT_KEY = (process.env.TIKTOK_CLIENT_KEY || 'sbawku6j5ckioz5v8d').trim();
 
-const TIKTOK_CLIENT_SECRET = (process.env.TIKTOK_CLIENT_SECRET || '').trim();
+const TIKTOK_CLIENT_SECRET = (process.env.TIKTOK_CLIENT_SECRET || 'bqOcBqhDrsKs6g5fCMJvX1rtv0AqFQfz').trim();
 
 const TIKTOK_REDIRECT_URI = (
   process.env.TIKTOK_REDIRECT_URI ||
