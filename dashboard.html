@@ -9819,6 +9819,10 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     return !!load('mb_youtube_access_token','') || !!loadJson('mb_youtube_channel', null);
   }
 
+  function tiktokHasData(){
+    return !!load('mb_tiktok_access_token','') || !!loadJson('mb_tiktok_profile', null);
+  }
+
   function soundcloudHasData(){
     return !!(load('mb_soundcloud_access_token','') || loadJson('mb_soundcloud_api_stats', null) || loadJson('mb_soundcloud_profile', null));
   }
@@ -9971,6 +9975,70 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     );
   }
 
+  function getTikTokUser(profileBundle){
+    profileBundle = profileBundle || loadJson('mb_tiktok_profile', {}) || {};
+    return (profileBundle.data && profileBundle.data.user) || profileBundle.user || profileBundle.data || profileBundle || {};
+  }
+
+  function getTikTokVideos(videosBundle){
+    videosBundle = videosBundle || loadJson('mb_tiktok_videos', {}) || {};
+    if (Array.isArray(videosBundle)) return videosBundle;
+    if (Array.isArray(videosBundle.videos)) return videosBundle.videos;
+    if (videosBundle.data && Array.isArray(videosBundle.data.videos)) return videosBundle.data.videos;
+    if (videosBundle.data && Array.isArray(videosBundle.data)) return videosBundle.data;
+    return [];
+  }
+
+  function renderTikTokCardFromSaved(){
+    var user = getTikTokUser();
+    var videos = getTikTokVideos();
+    var recentViews = 0, recentLikes = 0, recentComments = 0, recentShares = 0;
+    videos.forEach(function(v){
+      recentViews += numberFrom(v, ['view_count','views','play_count']);
+      recentLikes += numberFrom(v, ['like_count','likes_count','likes']);
+      recentComments += numberFrom(v, ['comment_count','comments_count','comments']);
+      recentShares += numberFrom(v, ['share_count','shares_count','shares']);
+    });
+    var top = videos.slice().sort(function(a,b){
+      return numberFrom(b, ['view_count','views','play_count']) - numberFrom(a, ['view_count','views','play_count']);
+    })[0];
+    upsertPlatformCard('platformCardTikTok',
+      '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">' +
+        '<div><div style="font-weight:900;font-size:17px">TikTok</div><div class="tiny muted">' + esc(user.display_name || user.username || 'Connected account') + '</div></div>' +
+        '<span class="tag">API</span>' +
+      '</div>' +
+      '<div class="weekly-platform-stats" style="margin-top:12px">' +
+        '<span class="weekly-stat-pill">Followers: <strong>' + fmt(numberFrom(user, ['follower_count','followers_count','followers'])) + '</strong></span>' +
+        '<span class="weekly-stat-pill">Following: <strong>' + fmt(numberFrom(user, ['following_count','following'])) + '</strong></span>' +
+        '<span class="weekly-stat-pill">Total likes: <strong>' + fmt(numberFrom(user, ['likes_count','like_count','likes'])) + '</strong></span>' +
+        '<span class="weekly-stat-pill">Videos: <strong>' + fmt(numberFrom(user, ['video_count','videos_count']) || videos.length) + '</strong></span>' +
+        '<span class="weekly-stat-pill">Recent views: <strong>' + fmt(recentViews) + '</strong></span>' +
+        '<span class="weekly-stat-pill">Recent likes: <strong>' + fmt(recentLikes) + '</strong></span>' +
+        '<span class="weekly-stat-pill">Recent comments: <strong>' + fmt(recentComments) + '</strong></span>' +
+        '<span class="weekly-stat-pill">Recent shares: <strong>' + fmt(recentShares) + '</strong></span>' +
+      '</div>' +
+      '<div class="tiny muted" style="margin-top:10px">' + (top ? 'Top recent video: <strong>' + esc(top.title || top.description || top.id || 'Video') + '</strong>' : 'TikTok is connected. Recent video metrics will appear when TikTok returns video data.') + '</div>'
+    );
+  }
+
+  async function analyzeTikTok(){
+    var token = load('mb_tiktok_access_token','');
+    if (token) {
+      var profileResp = await fetch(BACKEND + '/api/tiktok/user', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({access_token:token})});
+      var profileData = await profileResp.json().catch(function(){ return {}; });
+      if (!profileResp.ok) throw new Error(profileData.error_description || profileData.error_message || profileData.error || 'Could not refresh TikTok profile.');
+      saveJson('mb_tiktok_profile', profileData || {});
+      try {
+        var videosResp = await fetch(BACKEND + '/api/tiktok/videos', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({access_token:token,max_count:10})});
+        var videosData = await videosResp.json().catch(function(){ return {}; });
+        if (videosResp.ok) saveJson('mb_tiktok_videos', videosData || {});
+        else console.warn('TikTok videos refresh failed:', videosData);
+      } catch(e) { console.warn('TikTok videos refresh failed:', e); }
+    }
+    if (!tiktokHasData()) throw new Error('No TikTok account is connected. Connect TikTok first.');
+    renderTikTokCardFromSaved();
+  }
+
   async function analyzeYouTube(){
     var token = load('mb_youtube_access_token','');
     if (token) {
@@ -10014,6 +10082,10 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
         var ytc = loadJson('mb_youtube_channel', {}) || {};
         var yts = ytc.statistics || {};
         html.push('<li><strong>YouTube:</strong> ' + esc(ytc && ytc.snippet && ytc.snippet.title || 'Connected') + ' • Subscribers: ' + fmt(yts.subscriberCount || 0) + ' • Views: ' + fmt(yts.viewCount || 0) + '</li>');
+      }
+      if (ran.indexOf('TikTok') >= 0) {
+        var ttu = getTikTokUser();
+        html.push('<li><strong>TikTok:</strong> ' + esc(ttu.display_name || ttu.username || 'Connected') + ' • Followers: ' + fmt(numberFrom(ttu, ['follower_count','followers_count','followers'])) + ' • Likes: ' + fmt(numberFrom(ttu, ['likes_count','like_count','likes'])) + '</li>');
       }
       signals.innerHTML = html.join('') || '<li>No platform stats loaded yet.</li>';
     }
@@ -10100,8 +10172,9 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
         var shouldRunInstagram = selected.indexOf('instagram') >= 0 || (selected.length === 0 && instagramHasData());
         var shouldRunSoundCloud = selected.indexOf('soundcloud') >= 0 || (selected.length === 0 && soundcloudHasData());
         var shouldRunYouTube = selected.indexOf('youtube') >= 0 || (selected.length === 0 && youtubeHasData());
+        var shouldRunTikTok = selected.indexOf('tiktok') >= 0 || (selected.length === 0 && tiktokHasData());
 
-        if (!shouldRunInstagram && !shouldRunSoundCloud && !shouldRunYouTube) return;
+        if (!shouldRunInstagram && !shouldRunSoundCloud && !shouldRunYouTube && !shouldRunTikTok) return;
 
         e.preventDefault();
         e.stopPropagation();
@@ -10110,27 +10183,37 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
         showScan(true);
         (async function(){
           var ran = [];
+          var failed = [];
           var scOut = null;
           if (shouldRunSoundCloud) {
-            if (typeof window.mbAnalyzeSoundCloudOnly !== 'function') throw new Error('SoundCloud analyzer is not loaded.');
-            scOut = await window.mbAnalyzeSoundCloudOnly();
-            renderSoundCloudCardFromSaved(scOut || {});
-            ran.push('SoundCloud');
+            try {
+              if (typeof window.mbAnalyzeSoundCloudOnly !== 'function') throw new Error('SoundCloud analyzer is not loaded.');
+              scOut = await window.mbAnalyzeSoundCloudOnly();
+              renderSoundCloudCardFromSaved(scOut || {});
+              ran.push('SoundCloud');
+            } catch(err) { console.warn('SoundCloud analyze failed:', err); failed.push('SoundCloud'); }
+          }
+          if (shouldRunTikTok) {
+            try { await analyzeTikTok(); ran.push('TikTok'); }
+            catch(err) { console.warn('TikTok analyze failed:', err); failed.push('TikTok'); }
           }
           if (shouldRunYouTube) {
-            await analyzeYouTube();
-            ran.push('YouTube');
+            try { await analyzeYouTube(); ran.push('YouTube'); }
+            catch(err) { console.warn('YouTube analyze failed:', err); failed.push('YouTube'); }
           }
           if (shouldRunInstagram) {
-            await analyzeInstagram();
-            ran.push('Instagram');
+            try { await analyzeInstagram(); ran.push('Instagram'); }
+            catch(err) { console.warn('Instagram analyze failed:', err); failed.push('Instagram'); }
           }
-          // Final pass writes a shared summary only. The cards keep each platform's stats separate.
+          // Final pass writes a shared summary only. Each provider is isolated so one expired token cannot stop the others.
           if (ran.indexOf('SoundCloud') >= 0 && !qs('#platformCardSoundCloud')) renderSoundCloudCardFromSaved(scOut || {});
           if (ran.indexOf('Instagram') >= 0 && !qs('#platformCardInstagram')) renderInstagramCard();
           if (ran.indexOf('YouTube') >= 0 && !qs('#platformCardYouTube')) renderYouTubeCardFromSaved();
+          if (ran.indexOf('TikTok') >= 0 && !qs('#platformCardTikTok')) renderTikTokCardFromSaved();
           renderUnifiedResults(ran);
-          setStatus('mbUnifiedAnalyzeStatus', 'Analyzed: <strong>' + esc(ran.join(' + ')) + '</strong>.', true);
+          var statusText = ran.length ? ('Analyzed: <strong>' + esc(ran.join(' + ')) + '</strong>.') : 'No selected platform could be analyzed.';
+          if (failed.length) statusText += ' <span style="color:#b45309">Reconnect/check: ' + esc(failed.join(', ')) + '.</span>';
+          setStatus('mbUnifiedAnalyzeStatus', statusText, ran.length > 0);
         })().catch(function(err){
           console.error('Unified Analyze failed:', err);
           setStatus('mbUnifiedAnalyzeStatus', 'Analyze failed: ' + esc(err && err.message ? err.message : 'Unknown error'), false);
