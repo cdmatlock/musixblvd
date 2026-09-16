@@ -9823,6 +9823,10 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     return !!load('mb_tiktok_access_token','') || !!loadJson('mb_tiktok_profile', null);
   }
 
+  function spotifyHasData(){
+    return !!load('mb_spotify_access_token','') || !!loadJson('mb_spotify_profile', null);
+  }
+
   function soundcloudHasData(){
     return !!(load('mb_soundcloud_access_token','') || loadJson('mb_soundcloud_api_stats', null) || loadJson('mb_soundcloud_profile', null));
   }
@@ -10021,6 +10025,78 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
     );
   }
 
+  function spotifyItems(bundle){
+    return Array.isArray(bundle && bundle.items) ? bundle.items : [];
+  }
+
+  function renderSpotifyCardFromSaved(){
+    var profile = loadJson('mb_spotify_profile', {}) || {};
+    var topArtists = spotifyItems(loadJson('mb_spotify_top_artists', {}) || {});
+    var topTracks = spotifyItems(loadJson('mb_spotify_top_tracks', {}) || {});
+    var recent = spotifyItems(loadJson('mb_spotify_recent', {}) || {});
+    var saved = loadJson('mb_spotify_saved_tracks', {}) || {};
+    var playlists = loadJson('mb_spotify_playlists', {}) || {};
+    var savedItems = spotifyItems(saved);
+    var playlistItems = spotifyItems(playlists);
+    var artistNames = topArtists.slice(0,5).map(function(a){ return a && a.name; }).filter(Boolean);
+    var trackNames = topTracks.slice(0,5).map(function(t){ return t && t.name; }).filter(Boolean);
+    var recentArtists = {};
+    recent.forEach(function(item){
+      var artists = item && item.track && Array.isArray(item.track.artists) ? item.track.artists : [];
+      artists.forEach(function(a){ if (a && a.name) recentArtists[a.name] = (recentArtists[a.name] || 0) + 1; });
+    });
+    var recentLeader = Object.keys(recentArtists).sort(function(a,b){ return recentArtists[b] - recentArtists[a]; })[0] || '';
+    var insight = recentLeader
+      ? 'Recent listening leans toward <strong>' + esc(recentLeader) + '</strong>. Use this taste signal to guide collaborations, references, and audience research.'
+      : 'Use top artists and tracks as taste signals for collaborations, references, and audience research.';
+    upsertPlatformCard('platformCardSpotify',
+      '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">' +
+        '<div><div style="font-weight:900;font-size:17px">Spotify</div><div class="tiny muted">' + esc(profile.display_name || 'Connected listener') + '</div></div>' +
+        '<span class="tag">API</span>' +
+      '</div>' +
+      '<div class="weekly-platform-stats" style="margin-top:12px">' +
+        '<span class="weekly-stat-pill">Top artists loaded: <strong>' + fmt(topArtists.length) + '</strong></span>' +
+        '<span class="weekly-stat-pill">Top tracks loaded: <strong>' + fmt(topTracks.length) + '</strong></span>' +
+        '<span class="weekly-stat-pill">Recent plays loaded: <strong>' + fmt(recent.length) + '</strong></span>' +
+        '<span class="weekly-stat-pill">Saved tracks: <strong>' + fmt(saved.total == null ? savedItems.length : saved.total) + '</strong></span>' +
+        '<span class="weekly-stat-pill">Playlists: <strong>' + fmt(playlists.total == null ? playlistItems.length : playlists.total) + '</strong></span>' +
+      '</div>' +
+      (artistNames.length ? '<div class="tiny" style="margin-top:10px"><strong>Top artists:</strong> ' + esc(artistNames.join(', ')) + '</div>' : '') +
+      (trackNames.length ? '<div class="tiny" style="margin-top:6px"><strong>Top tracks:</strong> ' + esc(trackNames.join(', ')) + '</div>' : '') +
+      '<div class="tiny muted" style="margin-top:10px">' + insight + '</div>' +
+      '<div class="tiny muted" style="margin-top:8px">Spotify Web API does not provide private Spotify for Artists stream/play counts here, so MusixBlvd does not invent them.</div>'
+    );
+  }
+
+  async function spotifyPost(path, token, extra){
+    var body = Object.assign({access_token:token}, extra || {});
+    var resp = await fetch(BACKEND + path, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    var data = await resp.json().catch(function(){ return {}; });
+    if (!resp.ok) throw new Error(data.error_description || (data.error && data.error.message) || data.error || ('Spotify request failed: ' + path));
+    return data;
+  }
+
+  async function analyzeSpotify(){
+    var token = load('mb_spotify_access_token','');
+    if (!token) throw new Error('No Spotify account is connected. Connect Spotify first.');
+    var profile = await spotifyPost('/api/spotify/me', token);
+    saveJson('mb_spotify_profile', profile || {});
+    var jobs = [
+      ['/api/spotify/top','mb_spotify_top_artists',{type:'artists',time_range:'medium_term',limit:10}],
+      ['/api/spotify/top','mb_spotify_top_tracks',{type:'tracks',time_range:'medium_term',limit:10}],
+      ['/api/spotify/recent','mb_spotify_recent',{limit:25}],
+      ['/api/spotify/saved-tracks','mb_spotify_saved_tracks',{limit:25}],
+      ['/api/spotify/playlists','mb_spotify_playlists',{limit:25}]
+    ];
+    var failures = [];
+    for (var i=0;i<jobs.length;i++) {
+      try { saveJson(jobs[i][1], await spotifyPost(jobs[i][0], token, jobs[i][2])); }
+      catch(err) { console.warn('Spotify optional data failed:', jobs[i][0], err); failures.push(jobs[i][0]); }
+    }
+    renderSpotifyCardFromSaved();
+    if (failures.length === jobs.length) throw new Error('Spotify is connected, but the current authorization does not include the analytics scopes yet. Reconnect Spotify once.');
+  }
+
   async function analyzeTikTok(){
     var token = load('mb_tiktok_access_token','');
     if (token) {
@@ -10086,6 +10162,12 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
       if (ran.indexOf('TikTok') >= 0) {
         var ttu = getTikTokUser();
         html.push('<li><strong>TikTok:</strong> ' + esc(ttu.display_name || ttu.username || 'Connected') + ' • Followers: ' + fmt(numberFrom(ttu, ['follower_count','followers_count','followers'])) + ' • Likes: ' + fmt(numberFrom(ttu, ['likes_count','like_count','likes'])) + '</li>');
+      }
+      if (ran.indexOf('Spotify') >= 0) {
+        var sp = loadJson('mb_spotify_profile', {}) || {};
+        var spa = spotifyItems(loadJson('mb_spotify_top_artists', {}) || {});
+        var spt = spotifyItems(loadJson('mb_spotify_top_tracks', {}) || {});
+        html.push('<li><strong>Spotify:</strong> ' + esc(sp.display_name || 'Connected') + ' • Top artist: ' + esc(spa[0] && spa[0].name || '—') + ' • Top track: ' + esc(spt[0] && spt[0].name || '—') + '</li>');
       }
       signals.innerHTML = html.join('') || '<li>No platform stats loaded yet.</li>';
     }
@@ -10173,8 +10255,9 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
         var shouldRunSoundCloud = selected.indexOf('soundcloud') >= 0 || (selected.length === 0 && soundcloudHasData());
         var shouldRunYouTube = selected.indexOf('youtube') >= 0 || (selected.length === 0 && youtubeHasData());
         var shouldRunTikTok = selected.indexOf('tiktok') >= 0 || (selected.length === 0 && tiktokHasData());
+        var shouldRunSpotify = selected.indexOf('spotify') >= 0 || (selected.length === 0 && spotifyHasData());
 
-        if (!shouldRunInstagram && !shouldRunSoundCloud && !shouldRunYouTube && !shouldRunTikTok) return;
+        if (!shouldRunInstagram && !shouldRunSoundCloud && !shouldRunYouTube && !shouldRunTikTok && !shouldRunSpotify) return;
 
         e.preventDefault();
         e.stopPropagation();
@@ -10197,6 +10280,10 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
             try { await analyzeTikTok(); ran.push('TikTok'); }
             catch(err) { console.warn('TikTok analyze failed:', err); failed.push('TikTok'); }
           }
+          if (shouldRunSpotify) {
+            try { await analyzeSpotify(); ran.push('Spotify'); }
+            catch(err) { console.warn('Spotify analyze failed:', err); failed.push('Spotify'); }
+          }
           if (shouldRunYouTube) {
             try { await analyzeYouTube(); ran.push('YouTube'); }
             catch(err) { console.warn('YouTube analyze failed:', err); failed.push('YouTube'); }
@@ -10210,6 +10297,7 @@ const MB_MIKE_CHAT_ENDPOINT = (location.hostname && location.hostname.includes('
           if (ran.indexOf('Instagram') >= 0 && !qs('#platformCardInstagram')) renderInstagramCard();
           if (ran.indexOf('YouTube') >= 0 && !qs('#platformCardYouTube')) renderYouTubeCardFromSaved();
           if (ran.indexOf('TikTok') >= 0 && !qs('#platformCardTikTok')) renderTikTokCardFromSaved();
+          if (ran.indexOf('Spotify') >= 0 && !qs('#platformCardSpotify')) renderSpotifyCardFromSaved();
           renderUnifiedResults(ran);
           var statusText = ran.length ? ('Analyzed: <strong>' + esc(ran.join(' + ')) + '</strong>.') : 'No selected platform could be analyzed.';
           if (failed.length) statusText += ' <span style="color:#b45309">Reconnect/check: ' + esc(failed.join(', ')) + '.</span>';
