@@ -60,7 +60,7 @@ const SPOTIFY_REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI || 'https://musixb
 const SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize';
 const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
 const SPOTIFY_API_BASE_URL = 'https://api.spotify.com/v1';
-const SPOTIFY_SCOPE = 'user-read-private user-read-email';
+const SPOTIFY_SCOPE = 'user-read-private user-top-read user-read-recently-played user-library-read playlist-read-private playlist-read-collaborative';
 
 const X_CLIENT_ID = process.env.X_CLIENT_ID || '';
 const X_CLIENT_SECRET = process.env.X_CLIENT_SECRET || '';
@@ -883,6 +883,52 @@ app.post('/api/spotify/me', async (req, res) => {
     return res.status(500).json({ error: 'Spotify profile fetch failed.' });
   }
 });
+
+async function spotifyGet(req, res, endpoint, params = {}) {
+  try {
+    const accessToken = typeof req.body?.access_token === 'string' ? req.body.access_token.trim() : '';
+    if (!accessToken) return res.status(400).json({ error: 'Missing Spotify access token.' });
+    const url = new URL(`${SPOTIFY_API_BASE_URL}${endpoint}`);
+    Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, String(value)));
+    const response = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' }
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok) return res.status(response.status).json(data);
+    return res.json(data);
+  } catch (error) {
+    console.error('Spotify data fetch error:', error);
+    return res.status(500).json({ error: 'Spotify data fetch failed.' });
+  }
+}
+
+app.post('/api/spotify/top', async (req, res) => {
+  const type = req.body?.type === 'artists' ? 'artists' : 'tracks';
+  const allowedRanges = new Set(['short_term', 'medium_term', 'long_term']);
+  const timeRange = allowedRanges.has(req.body?.time_range) ? req.body.time_range : 'medium_term';
+  const limitRaw = Number.parseInt(req.body?.limit, 10);
+  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 50) : 10;
+  return spotifyGet(req, res, `/me/top/${type}`, { time_range: timeRange, limit });
+});
+
+app.post('/api/spotify/recent', async (req, res) => {
+  const limitRaw = Number.parseInt(req.body?.limit, 10);
+  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 50) : 25;
+  return spotifyGet(req, res, '/me/player/recently-played', { limit });
+});
+
+app.post('/api/spotify/saved-tracks', async (req, res) => {
+  const limitRaw = Number.parseInt(req.body?.limit, 10);
+  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 50) : 25;
+  return spotifyGet(req, res, '/me/tracks', { limit });
+});
+
+app.post('/api/spotify/playlists', async (req, res) => {
+  const limitRaw = Number.parseInt(req.body?.limit, 10);
+  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 50) : 25;
+  return spotifyGet(req, res, '/me/playlists', { limit });
+});
+
 
 // ============================================================================
 // X OAuth 2.0 + PKCE (ready when X developer credentials are added)
