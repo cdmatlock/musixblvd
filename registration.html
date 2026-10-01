@@ -517,7 +517,7 @@
         }
 
         await sendEmailVerification(cred.user, {
-          url: new URL('login.html', window.location.href).href
+          url: 'https://musixblvd.com/login.html'
         });
         try { await signOut(auth); } catch (_e) {}
         setStatus('Account created! Check your email and click the verification link before signing in.', 'ok');
