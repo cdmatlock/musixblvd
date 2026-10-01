@@ -154,16 +154,16 @@
       .btn-row .btn{flex:1 1 auto}
     }
 
-    .genre-tags{
+    .genre-tags,.role-tags{
       display:flex;flex-wrap:wrap;gap:10px;
     }
-    .genre-chip{
+    .genre-chip,.role-chip{
       display:inline-flex;align-items:center;gap:8px;padding:10px 12px;
       border:1px solid var(--line);border-radius:999px;background:#fff;cursor:pointer;
       font-size:13px;font-weight:700;color:#334155;
     }
-    .genre-chip input{width:16px;height:16px;margin:0}
-    .genre-chip:has(input:checked){
+    .genre-chip input,.role-chip input{width:16px;height:16px;margin:0}
+    .genre-chip:has(input:checked),.role-chip:has(input:checked){
       border-color:#93c5fd;background:#eff6ff;color:#0369a1;
       box-shadow:0 0 0 3px rgba(147,197,253,.22)
     }
@@ -258,19 +258,20 @@
           <div class="section">
             <div class="section-title">Artist profile</div>
             <div class="grid three">
-              <label>
-                <span class="label">Role</span>
-                <select id="role" name="role">
-                  <option value="Artist">Artist</option>
-                  <option value="Producer">Producer</option>
-                  <option value="Songwriter">Songwriter</option>
-                  <option value="Engineer">Engineer</option>
-                  <option value="DJ">DJ</option>
-                  <option value="Manager">Manager</option>
-                  <option value="Other">Other</option>
-                   <option value="Dancers">Dancers</option>
-                </select>
-              </label>
+              <div>
+                <span class="label">Roles</span>
+                <div class="role-tags" id="roleTags">
+                  <label class="role-chip"><input type="checkbox" value="Artist"> <span>Artist</span></label>
+                  <label class="role-chip"><input type="checkbox" value="Producer"> <span>Producer</span></label>
+                  <label class="role-chip"><input type="checkbox" value="Songwriter"> <span>Songwriter</span></label>
+                  <label class="role-chip"><input type="checkbox" value="Engineer"> <span>Engineer</span></label>
+                  <label class="role-chip"><input type="checkbox" value="DJ"> <span>DJ</span></label>
+                  <label class="role-chip"><input type="checkbox" value="Manager"> <span>Manager</span></label>
+                  <label class="role-chip"><input type="checkbox" value="Dancer"> <span>Dancer</span></label>
+                  <label class="role-chip"><input type="checkbox" value="Other"> <span>Other</span></label>
+                </div>
+                <div class="help">Select one or more roles.</div>
+              </div>
               <label style="grid-column:span 2">
                 <span class="label">Genres</span>
                 <div class="genre-tags" id="genreTags">
@@ -331,7 +332,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getAuth, createUserWithEmailAndPassword, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { getAuth, createUserWithEmailAndPassword, updateProfile, sendEmailVerification, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import { getFirestore, doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -369,7 +370,8 @@
       const shortGoal = trimGoalTo20Words(document.getElementById('goal').value.trim());
       const fullName = document.getElementById('full_name').value.trim();
       const artistName = document.getElementById('artist_name').value.trim();
-      const role = document.getElementById('role').value;
+      const roles = [...document.querySelectorAll('#roleTags input:checked')].map(el => el.value);
+      const role = roles.join(', ');
       const city = document.getElementById('city').value.trim();
       const daw = document.getElementById('daw').value.trim();
       const email = document.getElementById('email').value.trim();
@@ -383,6 +385,7 @@
         handle: '',
         role,
         roleLabel: role,
+        roles,
         genre: selectedGenres,
         tags: selectedGenres,
         skills: selectedGenres,
@@ -403,6 +406,12 @@
       const password = document.getElementById('password').value;
       const agreed = document.getElementById('agree_terms').checked;
       const selectedGenres = [...document.querySelectorAll('#genreTags input:checked')];
+      const selectedRoles = [...document.querySelectorAll('#roleTags input:checked')];
+
+      if(!selectedRoles.length){
+        setStatus('Select at least one role.', 'err');
+        return false;
+      }
 
       if(!selectedGenres.length){
         setStatus('Select at least one genre tag.', 'err');
@@ -490,6 +499,7 @@
             handle: payload.handle,
             role: payload.role,
             roleLabel: payload.roleLabel,
+            roles: payload.roles,
             genre: payload.genre,
             tags: payload.tags,
             city: payload.city,
@@ -506,12 +516,17 @@
           console.warn('Firestore user profile save blocked. Check Firestore rules:', firestoreErr);
         }
 
-        setStatus('Account created. Entering dashboard...', 'ok');
-        setTimeout(function(){ window.location.assign(DASHBOARD_URL); }, 350);
+        await sendEmailVerification(cred.user, {
+          url: new URL('login.html', window.location.href).href
+        });
+        try { await signOut(auth); } catch (_e) {}
+        setStatus('Account created! Check your email and click the verification link before signing in.', 'ok');
+        createBtn.textContent = 'Verification Email Sent';
+        form.reset();
       }catch(err){
         setStatus(mapAuthError(err), 'err');
       } finally {
-        createBtn.disabled = false;
+        if(createBtn.textContent !== 'Verification Email Sent') createBtn.disabled = false;
       }
     });
   </script>
