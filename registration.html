@@ -516,9 +516,7 @@
           console.warn('Firestore user profile save blocked. Check Firestore rules:', firestoreErr);
         }
 
-        await sendEmailVerification(cred.user, {
-          url: 'https://musixblvd.com/login.html'
-        });
+        await sendEmailVerification(cred.user);
         try { await signOut(auth); } catch (_e) {}
         setStatus('Account created! Check your email and click the verification link before signing in.', 'ok');
         createBtn.textContent = 'Verification Email Sent';
